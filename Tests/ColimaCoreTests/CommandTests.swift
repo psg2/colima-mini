@@ -29,6 +29,15 @@ final class CommandTests: XCTestCase {
     } catch { XCTAssertTrue(error.localizedDescription.contains("timed out")) }
     XCTAssertLessThan(Date().timeIntervalSince(start), 4)
   }
+  func testChildFindsHomebrewToolsWithLaunchdPath() async throws {
+    let path = try await Command.run(
+      "/bin/sh", ["-c", "printf %s \"$PATH\""],
+      environment: ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"])
+    let directories = path.split(separator: ":")
+    XCTAssertTrue(directories.contains("/opt/homebrew/bin"))
+    XCTAssertTrue(directories.contains("/usr/local/bin"))
+    XCTAssertEqual(directories.first, "/usr/bin")
+  }
   func testExplicitExecutableOverrideMustExist() {
     let tools = Toolchain(environment: ["COLIMA_MINI_DOCKER": "/nonexistent/docker"])
     XCTAssertThrowsError(try tools.executable("docker"))
