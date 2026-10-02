@@ -256,6 +256,27 @@ private actor ResultGate<Value> {
     XCTAssertEqual(model.route, .containers)
     XCTAssertEqual(model.project, "demo")
   }
+  func testRemovalOffersOnlyStoppedContainersAndLeavesTheRemovedPage() async throws {
+    let running = try snapshot()
+    let stopped = try snapshot(running: false)
+    let gone = try Snapshot.decode(
+      vm: #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#,
+      containers: "", stats: "")
+    let model = Dashboard(backend: backend(), readSnapshot: { gone })
+    model.snapshot = running
+    model.request("rm", containers: [running.containers[0]])
+    XCTAssertNil(model.pending, "A running container was offered for removal")
+
+    model.snapshot = stopped
+    model.navigate(.containers, project: "demo")
+    model.openContainer("abc123")
+    model.request("rm", containers: stopped.containers)
+    let action = try XCTUnwrap(model.pending)
+    XCTAssertEqual(action.containers.map(\.id), ["abc123"])
+    XCTAssertEqual(action.label, "Remove")
+    await model.perform(action)
+    XCTAssertEqual(model.route, .containers)
+  }
   func testReopeningTheSameContainerKeepsOneBackStep() async throws {
     let model = Dashboard(backend: backend())
     model.navigate(.volumes)

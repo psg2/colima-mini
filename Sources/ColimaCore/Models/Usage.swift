@@ -5,11 +5,18 @@ package struct Usage: Decodable {
   package let cpuPercent: String
   package let memoryUsage: String
   package let memoryPercent: String
+  // "received / sent", "read / written" and the process count, when Docker reports them.
+  package var networkIO: String? = nil
+  package var blockIO: String? = nil
+  package var pids: String? = nil
   enum CodingKeys: String, CodingKey {
     case id = "ID"
     case cpuPercent = "CPUPerc"
     case memoryUsage = "MemUsage"
     case memoryPercent = "MemPerc"
+    case networkIO = "NetIO"
+    case blockIO = "BlockIO"
+    case pids = "PIDs"
   }
   package var cpu: Double { Double(cpuPercent.replacingOccurrences(of: "%", with: "")) ?? 0 }
   package var memoryBytes: Double {

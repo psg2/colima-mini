@@ -101,6 +101,10 @@ struct ContainerDetailView: View {
           model.request(c.running ? "stop" : "start", containers: [c])
         }
         .disabled(model.busy || model.sample).accessibilityIdentifier("container.toggle")
+        if !c.running {
+          Button("Remove…") { model.request("rm", containers: [c]) }
+            .disabled(model.busy || model.sample).accessibilityIdentifier("container.remove")
+        }
         Button("Restart…") { model.request("restart", containers: [c]) }
           .disabled(!c.running || model.busy || model.sample).accessibilityIdentifier(
             "container.restart")
@@ -112,6 +116,13 @@ struct ContainerDetailView: View {
         if let metric = model.snapshot?.metric(for: c) {
           Text("CPU " + metric.cpuPercent).monospacedDigit()
           Text("Memory " + memoryText(metric.memoryBytes)).monospacedDigit()
+          if let network = metric.networkIO {
+            Text("Net I/O " + network).monospacedDigit().help("Received / sent since start")
+          }
+          if let block = metric.blockIO {
+            Text("Disk I/O " + block).monospacedDigit().help("Read / written since start")
+          }
+          if let pids = metric.pids { Text("PIDs " + pids).monospacedDigit() }
         }
       }.font(.caption)
       Divider()

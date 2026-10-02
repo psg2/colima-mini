@@ -26,6 +26,8 @@ struct VolumesView: View {
             .secondary)
         }
         Spacer()
+        Button("Reclaim space…") { model.openReclaim() }
+          .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
         RefreshButton(busy: model.volumesLoading) { await model.loadVolumes() }
       }
       HStack {

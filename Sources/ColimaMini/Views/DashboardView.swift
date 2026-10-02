@@ -25,6 +25,9 @@ struct DashboardView: View {
         HStack(spacing: 8) {
           if model.refreshing || model.busy { ProgressView().controlSize(.small) }
           Text(model.busy ? "Applying action…" : "Context: colima")
+          if !model.busy, let snapshot = model.snapshot, snapshot.vm.running {
+            StatusBarUsage(snapshot: snapshot, filesystem: model.storage?.filesystem)
+          }
           Spacer()
           Button {
             palette = true
@@ -50,7 +53,7 @@ struct DashboardView: View {
       titleVisibility: .visible
     ) {
       if let action = model.pending {
-        Button(action.verb.capitalized, role: action.verb == "start" ? nil : .destructive) {
+        Button(action.label, role: action.verb == "start" ? nil : .destructive) {
           Task { await model.perform(action) }
         }
       }
@@ -59,7 +62,10 @@ struct DashboardView: View {
     }
     .sheet(isPresented: $model.showingSweep) { CleanupReportView(model: model) }
     .sheet(isPresented: $model.showingReclaim) { ReclaimView(model: model) }
-    .task { await model.refresh() }
+    .task {
+      await model.refresh()
+      if model.storage == nil { await model.loadStorage() }
+    }
     .hidingWindowTitle()
   }
   @ViewBuilder var page: some View {
@@ -107,8 +113,8 @@ struct ContainersView: View {
         }
         RefreshButton(busy: model.refreshing || model.busy) { await model.refresh() }
       }.padding(20)
-      if let snapshot = model.snapshot {
-        ResourceOverview(snapshot: snapshot).padding(.horizontal, 20).padding(.bottom, 16)
+      if let snapshot = model.snapshot, snapshot.containers.contains(where: \.needsAttention) {
+        ResourceOverview(snapshot: snapshot).padding(.horizontal, 20).padding(.bottom, 12)
       }
       HStack(spacing: 12) {
         Picker("View", selection: $model.grouped) {
@@ -155,5 +161,28 @@ extension View {
     } else {
       self
     }
+  }
+}
+
+// VM-wide usage in the status bar, like Docker Desktop's footer.
+struct StatusBarUsage: View {
+  let snapshot: Snapshot
+  let filesystem: FilesystemUsage?
+  var body: some View {
+    HStack(spacing: 10) {
+      Text(
+        String(
+          format: "CPU %.1f%%",
+          snapshot.totalCPU(snapshot.containers) / Double(max(1, snapshot.vm.cpus))))
+      Text(
+        "Memory " + memoryText(snapshot.totalMemory(snapshot.containers)) + " / "
+          + memoryText(Double(snapshot.vm.memory)))
+      if let filesystem {
+        Text(
+          "Disk " + bytesText(Double(filesystem.usedBytes)) + " / "
+            + bytesText(Double(filesystem.sizeBytes)))
+      }
+    }.monospacedDigit().foregroundStyle(.tertiary)
+      .help("Container CPU relative to the VM, container memory, and the Docker data disk")
   }
 }

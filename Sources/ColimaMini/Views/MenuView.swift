@@ -75,7 +75,10 @@ struct MenuView: View {
           .accessibilityIdentifier("menu.quit")
       }
     }.padding(16).frame(width: 340)
-      .task { await model.refresh() }
+      .task {
+        await model.refresh()
+        if model.storage == nil { await model.loadStorage() }
+      }
   }
 
   private var header: some View {
@@ -119,6 +122,13 @@ struct MenuView: View {
         Text(String(format: "CPU %.1f%%", cpu))
         Spacer()
         Text("Memory " + memoryText(memory) + " / " + memoryText(Double(snapshot.vm.memory)))
+        if let filesystem = model.storage?.filesystem {
+          Text(
+            String(
+              format: "Disk %.0f%%",
+              Double(filesystem.usedBytes) / Double(max(1, filesystem.sizeBytes)) * 100)
+          ).help(bytesText(Double(filesystem.usedBytes)) + " of the Docker data disk used")
+        }
       }.font(.caption).monospacedDigit().foregroundStyle(.secondary)
       ProgressView(value: min(1, memory / Double(max(1, snapshot.vm.memory)))).tint(.blue)
         .controlSize(.small)
@@ -147,6 +157,15 @@ struct MenuView: View {
     }
   }
 
+  private func projectDetail(_ containers: [Container], _ origin: ProjectOrigin?) -> String {
+    var parts: [String] = []
+    if containers.contains(where: \.running), let snapshot = model.snapshot {
+      parts.append(String(format: "CPU %.1f%%", snapshot.totalCPU(containers)))
+      parts.append("MEM " + memoryText(snapshot.totalMemory(containers)))
+    }
+    if let origin { parts.append(origin.summary) }
+    return parts.joined(separator: " · ")
+  }
   private func project(_ project: String) -> some View {
     let containers = model.containers.filter { $0.project == project }
     let origin = containers.lazy.compactMap(\.origin).first
@@ -161,9 +180,8 @@ struct MenuView: View {
               .rotationEffect(.degrees(isExpanded ? 90 : 0)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
               Text(project).lineLimit(1).truncationMode(.middle)
-              if let origin {
-                Text(origin.summary).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-              }
+              Text(projectDetail(containers, origin))
+                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             if containers.contains(where: \.needsAttention) {
@@ -199,7 +217,7 @@ struct MenuView: View {
             Button(container.service) { show(container) }.buttonStyle(.plain).lineLimit(1)
               .help(container.name + " · " + container.status)
             Spacer()
-            PortChips(ports: container.publishedPorts, limit: 2)
+            PortChips(ports: container.publishedPorts, limit: 2, compact: true)
             if container.running {
               Button {
                 Launcher.shell(container, model: model)
