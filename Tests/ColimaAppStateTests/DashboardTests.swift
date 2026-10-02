@@ -35,6 +35,20 @@ private actor ResultGate<Value> {
         "COLIMA_MINI_DOCKER": "/usr/bin/true", "COLIMA_MINI_COLIMA": "/usr/bin/true",
       ]))
   }
+  func testOnlyProjectsWhoseFolderIsGoneAreOrphaned() async throws {
+    let present = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: present, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: present) }
+    let vm = #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#
+    let containers = """
+      {"ID":"a1","Names":"kept-web-1","Image":"web","State":"running","Status":"Up","Ports":"","Labels":"com.docker.compose.project=kept,com.docker.compose.project.working_dir=\(present.path)"}
+      {"ID":"b2","Names":"gone-web-1","Image":"web","State":"exited","Status":"Exited (0)","Ports":"","Labels":"com.docker.compose.project=gone,com.docker.compose.project.working_dir=/nonexistent/\(UUID().uuidString)"}
+      {"ID":"c3","Names":"loose","Image":"web","State":"running","Status":"Up","Ports":"","Labels":""}
+      """
+    let model = Dashboard(backend: backend())
+    model.snapshot = try Snapshot.decode(vm: vm, containers: containers, stats: "")
+    XCTAssertEqual(model.orphanedProjects, ["gone"])
+  }
   func testOldRefreshCannotOverwriteCompletedStop() async throws {
     let gate = ResultGate<Snapshot>()
     let model = Dashboard(backend: backend(), readSnapshot: { try await gate.read() })

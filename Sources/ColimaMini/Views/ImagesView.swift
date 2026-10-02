@@ -27,8 +27,9 @@ struct ImagesView: View {
             .secondary)
         }
         Spacer()
-        Button("Reclaim space…") { model.openReclaim() }
+        Button("Remove unused…") { model.openReclaim(.images) }
           .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
+          .help("Preview dangling and unused images, then remove the ones you choose")
         RefreshButton(busy: model.imagesLoading) { await model.loadImages() }
       }
       HStack {

@@ -25,7 +25,11 @@ struct DashboardView: View {
           if model.refreshing || model.busy { ProgressView().controlSize(.small) }
           Text(model.busy ? "Applying action…" : "Context: colima")
           if !model.busy, let snapshot = model.snapshot, snapshot.vm.running {
-            StatusBarUsage(snapshot: snapshot, filesystem: model.storage?.filesystem)
+            Button {
+              model.navigate(.overview)
+            } label: {
+              StatusBarUsage(snapshot: snapshot, filesystem: model.storage?.filesystem)
+            }.buttonStyle(.plain)
           }
           Spacer()
           Button {
@@ -120,6 +124,24 @@ struct ContainersView: View {
             OpenFolderButton(model: model, origin: origin)
           }
           ProjectActions(model: model, containers: model.visible)
+        } else {
+          let orphaned = model.orphanedProjects
+          Button {
+            Task { await model.scan() }
+          } label: {
+            if orphaned.isEmpty {
+              Text("Review unused…")
+            } else {
+              Label("Review unused…", systemImage: "folder.badge.questionmark")
+            }
+          }
+          .disabled(model.scanning || model.busy || model.snapshot?.vm.running != true)
+          .help(
+            orphaned.isEmpty
+              ? "Find stacks whose folder was deleted and containers that are stopped or idle"
+              : "Folder deleted: " + orphaned.joined(separator: ", ")
+          )
+          .accessibilityIdentifier("containers.sweep")
         }
         RefreshButton(busy: model.refreshing || model.busy) { await model.refresh() }
       }.padding(20)

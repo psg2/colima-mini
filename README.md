@@ -99,7 +99,8 @@ The **Go** and **Container** menus list every shortcut.
   **Expand all** action, or switch to a flat container list. Searching reveals
   matching services without discarding your saved collapsed groups.
 - Overview shows the VM, counts, reclaimable estimates, containers that need
-  attention, resource meters and recent CPU. Overview CPU is relative to allocated
+  attention, resource meters and recent CPU. **Resources…** opens the VM settings,
+  and the status bar usage opens Overview. Overview CPU is relative to allocated
   VM capacity; row CPU follows Docker's 100% per core convention.
 - Each project shows where Compose ran it. Claude, Codex, Conductor and Orca
   worktrees are labeled, and a project whose folder was removed shows
@@ -153,8 +154,9 @@ The **Go** and **Container** menus list every shortcut.
 - Open **Networks** to see each network's driver, subnet, Compose project and the
   running containers on it, with their addresses. **Remove…** deletes an unused
   custom network without force; Docker refuses one a stopped container still uses.
-- Open Storage for disk measurements, **Reclaim space** and **Review unused
-  containers**. The scan groups containers by project, explains each verdict
+- **Review unused…** on the Containers page scans for stale stacks. It shows a
+  folder badge, as does the sidebar, when a project's folder or worktree was
+  deleted; the menu bar lists those projects too. The scan groups containers by project, explains each verdict
   (deleted worktree, stopped for over a day, idle, in use) and offers **Stop**
   or **Remove…** per group, with confirmation. The scan itself changes nothing.
 - Change CPU, RAM and refresh interval in Settings.
@@ -208,7 +210,9 @@ only grows through Settings.
 
 ### Reclaim space
 
-**Reclaim space…** (Storage, Overview or Command+K) previews what can go:
+**Reclaim space…** (Storage, the Go menu or Command+K) previews what can go. Images,
+Volumes and Networks each have their own **Remove unused…** (or **Remove anonymous…**),
+which opens the same preview limited to that page's objects:
 
 - **Selected by default:** build cache, dangling images and unused custom networks.
 - **Marked Review, selected only by you:**

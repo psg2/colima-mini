@@ -13,6 +13,12 @@ struct StorageView: View {
               .font(.caption).foregroundStyle(.secondary)
           }
           Spacer()
+          Button("Reclaim space…") { model.openReclaim() }
+            .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
+            .help(
+              "Preview build cache, unused images, networks, stopped containers and unattached anonymous volumes, then remove what you choose. Named volumes are kept."
+            )
+            .accessibilityIdentifier("storage.reclaim")
           RefreshButton(busy: model.storageLoading) { await model.loadStorage() }
         }
         if let error = model.storageError { StatusMessage(text: error) }
@@ -62,7 +68,13 @@ struct StorageView: View {
             }.font(.caption).foregroundStyle(.secondary)
             ForEach(storage.docker) { category in
               GridRow {
-                Text(category.type)
+                if let route = Self.page(for: category.type) {
+                  Button(category.type) {
+                    model.navigate(route, project: route == .containers ? "All containers" : nil)
+                  }.buttonStyle(.link)
+                } else {
+                  Text(category.type)
+                }
                 Text(category.totalCount.map(String.init) ?? "Unknown")
                 Text(bytesText(category.sizeBytes)).monospacedDigit()
                 Text(bytesText(category.reclaimableBytes)).monospacedDigit()
@@ -89,35 +101,15 @@ struct StorageView: View {
           Text("Refresh to measure storage. Colima will not be started automatically.")
             .foregroundStyle(.secondary)
         }
-        Divider()
-        HStack {
-          VStack(alignment: .leading, spacing: 5) {
-            Text("Reclaim space").font(.headline)
-            Text(
-              "Preview build cache, unused images, networks, stopped containers and unattached anonymous volumes, then remove what you choose. Named volumes are kept."
-            ).font(.caption).foregroundStyle(.secondary).fixedSize(
-              horizontal: false, vertical: true)
-          }
-          Spacer()
-          Button("Reclaim space…") { model.openReclaim() }
-            .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
-            .accessibilityIdentifier("storage.reclaim")
-        }
-        Divider()
-        HStack {
-          VStack(alignment: .leading, spacing: 5) {
-            Text("Unused containers").font(.headline)
-            Text(
-              "Find stacks whose worktree was deleted and containers that are stopped or idle, then stop or remove them. Volumes are kept."
-            )
-            .font(.caption).foregroundStyle(.secondary)
-          }
-          Spacer()
-          Button("Review unused containers") { Task { await model.scan() } }
-            .disabled(model.scanning || model.busy || model.snapshot?.vm.running != true)
-            .accessibilityIdentifier("storage.sweep")
-        }
       }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
     }.task { await model.loadStorage() }
+  }
+  private static func page(for type: String) -> AppRoute? {
+    switch type {
+    case "Images": return .images
+    case "Containers": return .containers
+    case "Local Volumes": return .volumes
+    default: return nil
+    }
   }
 }

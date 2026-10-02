@@ -109,6 +109,7 @@ package struct PendingAction: Identifiable {
   @Published package var cleanupResult: CleanupResult?
   @Published package var reclaiming = false
   @Published package var showingReclaim = false
+  @Published package var reclaimScope = ReclaimScope.all
   @Published package var showingPalette = false
   // Containers checked for a bulk action, by ID.
   @Published package var checked: Set<String> = []
@@ -213,6 +214,12 @@ package struct PendingAction: Identifiable {
     }
   }
   package var attention: [Container] { containers.filter(\.needsAttention) }
+  // Compose projects whose folder or worktree no longer exists: the clearest
+  // sign of a stack nobody will come back to.
+  package var orphanedProjects: [String] {
+    guard !sample else { return [] }
+    return (snapshot?.projects ?? []).filter { origin(of: $0).map { !$0.exists() } ?? false }
+  }
   package func origin(of project: String) -> ProjectOrigin? {
     containers.first { $0.project == project && $0.origin != nil }?.origin
   }
@@ -521,7 +528,8 @@ package struct PendingAction: Identifiable {
       storageError = nil
     } catch is CancellationError {} catch { storageError = error.localizedDescription }
   }
-  package func openReclaim() {
+  package func openReclaim(_ scope: ReclaimScope = .all) {
+    reclaimScope = scope
     cleanupResult = nil
     showingReclaim = true
   }
@@ -560,6 +568,7 @@ package struct PendingAction: Identifiable {
     await loadStorage()
     if !volumes.isEmpty { await loadVolumes() }
     if !images.isEmpty { await loadImages() }
+    if !networks.isEmpty { await loadNetworks() }
   }
   package func request(_ verb: String, containers: [Container], vm: Bool = false) {
     // Removal never forces: only stopped containers are offered, and Docker
@@ -662,6 +671,27 @@ package struct PendingAction: Identifiable {
   package func members(of group: SweepGroup) -> [Container] {
     containers.filter { container in
       group.containerIDs.contains { $0.hasPrefix(container.id) || container.id.hasPrefix($0) }
+    }
+  }
+}
+
+// A page's own cleanup opens Reclaim limited to that page's object types.
+package enum ReclaimScope: Equatable {
+  case all, images, volumes, networks
+  package var kinds: [CleanupKind] {
+    switch self {
+    case .all: return CleanupKind.allCases
+    case .images: return [.danglingImages, .unusedImages]
+    case .volumes: return [.anonymousVolumes]
+    case .networks: return [.networks]
+    }
+  }
+  package var title: String {
+    switch self {
+    case .all: return "Reclaim space"
+    case .images: return "Remove unused images"
+    case .volumes: return "Remove anonymous volumes"
+    case .networks: return "Remove unused networks"
     }
   }
 }

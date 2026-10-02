@@ -18,8 +18,6 @@ struct OverviewView: View {
               .secondary)
           }
           Spacer()
-          Button("Reclaim space…") { model.openReclaim() }
-            .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
           RefreshButton(busy: model.refreshing || model.storageLoading) {
             await model.refresh()
             await model.loadStorage()
@@ -33,11 +31,17 @@ struct OverviewView: View {
             stat(
               "\(snapshot.containers.filter(\.running).count)", "Running",
               "of \(countText(snapshot.containers.count, "container"))", "shippingbox"
-            ) { model.navigate(.containers, project: "All containers") }
+            ) {
+              model.onlyRunning = true
+              model.navigate(.containers, project: "All containers")
+            }
             stat(
               "\(snapshot.projects.filter { $0 != "Standalone" }.count)", "Projects",
               "Compose stacks", "square.stack.3d.up"
-            ) { model.navigate(.containers, project: "All containers") }
+            ) {
+              model.grouped = true
+              model.navigate(.containers, project: "All containers")
+            }
             stat(
               "\(model.attention.count)", "Need attention",
               model.attention.isEmpty ? "All clear" : "Unhealthy or failed",
@@ -77,15 +81,19 @@ struct OverviewView: View {
       }
       Spacer()
       if let vm = model.snapshot?.vm {
-        if vm.running {
-          Button("Restart…") { model.request("restart", containers: [], vm: true) }
-          Button("Stop…") { model.request("stop", containers: [], vm: true) }
-        } else {
-          Button("Start") { model.request("start", containers: [], vm: true) }
-            .buttonStyle(.borderedProminent)
-        }
+        Button("Resources…") { model.navigate(.settings) }
+          .help("CPU, memory and disk for the VM")
+        Group {
+          if vm.running {
+            Button("Restart…") { model.request("restart", containers: [], vm: true) }
+            Button("Stop…") { model.request("stop", containers: [], vm: true) }
+          } else {
+            Button("Start") { model.request("start", containers: [], vm: true) }
+              .buttonStyle(.borderedProminent)
+          }
+        }.disabled(model.busy || model.sample)
       }
-    }.disabled(model.busy || model.sample).padding(16).background(card)
+    }.padding(16).background(card)
   }
   private var vmFacts: String {
     guard let vm = model.snapshot?.vm else { return "Default profile" }
@@ -130,7 +138,11 @@ struct OverviewView: View {
           bytesText(Double(filesystem.usedBytes)) + " / " + bytesText(Double(filesystem.sizeBytes)),
           Double(filesystem.usedBytes) / Double(filesystem.sizeBytes), .purple)
       }
-      Text("Totals exclude the VM operating system.").font(.caption).foregroundStyle(.secondary)
+      HStack {
+        Text("Totals exclude the VM operating system.").font(.caption).foregroundStyle(.secondary)
+        Spacer()
+        Button("Storage details") { model.navigate(.storage) }.buttonStyle(.link).font(.caption)
+      }
     }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(card)
   }
   private var cpuHistory: some View {

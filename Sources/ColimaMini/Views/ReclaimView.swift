@@ -9,15 +9,18 @@ struct ReclaimView: View {
   @State private var selected = Set(CleanupKind.allCases.filter(\.safeByDefault))
   @State private var confirming = false
   private var plan: CleanupPlan? { model.cleanupPlan }
+  private var categories: [CleanupCategory] {
+    plan?.categories.filter { model.reclaimScope.kinds.contains($0.kind) } ?? []
+  }
   private var chosen: [CleanupCategory] {
-    plan?.categories.filter { selected.contains($0.kind) && !$0.items.isEmpty } ?? []
+    categories.filter { selected.contains($0.kind) && !$0.items.isEmpty }
   }
   private var chosenCount: Int { chosen.map(\.items.count).reduce(0, +) }
   private var chosenBytes: Double { chosen.map(\.bytes).reduce(0, +) }
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       HStack {
-        Text("Reclaim space").font(.title2.weight(.semibold))
+        Text(model.reclaimScope.title).font(.title2.weight(.semibold))
         Spacer()
         if model.cleanupLoading || model.reclaiming { ProgressView().controlSize(.small) }
         Button {
@@ -34,8 +37,8 @@ struct ReclaimView: View {
       if let plan {
         ScrollView {
           VStack(alignment: .leading, spacing: 8) {
-            ForEach(plan.categories.filter { !$0.items.isEmpty }) { row($0) }
-            let empty = plan.categories.filter(\.items.isEmpty)
+            ForEach(categories.filter { !$0.items.isEmpty }) { row($0) }
+            let empty = categories.filter(\.items.isEmpty)
             if !empty.isEmpty {
               Text("Nothing to remove: " + empty.map(\.kind.title).joined(separator: ", "))
                 .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 4)
@@ -65,6 +68,9 @@ struct ReclaimView: View {
       }
     }.padding(24).frame(width: 720, height: 600)
       .task { await model.loadCleanupPlan() }
+      .onAppear {
+        selected = Set(model.reclaimScope.kinds.filter(\.safeByDefault))
+      }
       .confirmationDialog(
         "Remove \(countText(chosenCount, "item"))?", isPresented: $confirming,
         titleVisibility: .visible
