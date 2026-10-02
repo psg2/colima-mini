@@ -21,7 +21,7 @@ package struct PendingAction: Identifiable {
 @MainActor package final class Dashboard: ObservableObject {
   package let backend: Backend
   private let readSnapshot: () async throws -> Snapshot
-  private let readLogs: (String) async throws -> String
+  private let streamLogs: (String) -> AsyncThrowingStream<String, Error>
   private let readDetails: (String) async throws -> ContainerDetails
   private let readVolumes: () async throws -> [Volume]
   private var refreshTask: Task<Snapshot, Error>?
@@ -52,6 +52,8 @@ package struct PendingAction: Identifiable {
   @Published package var logError: String?
   @Published package var logsLoading = false
   @Published package var logsPaused = false
+  // True while new output is arriving; false once the stream ended or failed.
+  @Published package var logsLive = false
   @Published package var logsDate: Date?
   @Published package var sweepReport = "Run a scan to find orphaned, stale or idle containers."
   @Published package var scanning = false
@@ -91,13 +93,13 @@ package struct PendingAction: Identifiable {
   package init(
     backend: Backend,
     readSnapshot: (() async throws -> Snapshot)? = nil,
-    readLogs: ((String) async throws -> String)? = nil,
+    streamLogs: ((String) -> AsyncThrowingStream<String, Error>)? = nil,
     readDetails: ((String) async throws -> ContainerDetails)? = nil,
     readVolumes: (() async throws -> [Volume])? = nil
   ) {
     self.backend = backend
     self.readSnapshot = readSnapshot ?? { try await backend.snapshot() }
-    self.readLogs = readLogs ?? { try await backend.logs($0) }
+    self.streamLogs = streamLogs ?? { backend.followLogs($0) }
     self.readDetails = readDetails ?? { try await backend.details($0) }
     self.readVolumes = readVolumes ?? { try await backend.volumes() }
     if backend.fixture == nil {
@@ -292,24 +294,45 @@ package struct PendingAction: Identifiable {
       .filter { actedOn[$0.containerID] == nil }
     if !alerts.isEmpty { onAlerts?(alerts) }
   }
-  package func loadLogs(_ id: String) async {
+  // Follows a container's output until the page changes, logs are paused or
+  // the container stops. The buffer is replaced only when the new stream
+  // produces output, so a failed start keeps the previous lines visible.
+  package func followLogs(_ id: String) async {
     guard route == .container(id), !logsPaused else { return }
     logGeneration += 1
     let generation = logGeneration
+    var current: String?
     logsLoading = true
-    defer { if generation == logGeneration { logsLoading = false } }
+    defer {
+      if generation == logGeneration {
+        logsLoading = false
+        logsLive = false
+      }
+    }
+    func valid() -> Bool {
+      generation == logGeneration && route == .container(id) && !Task.isCancelled && !logsPaused
+    }
     do {
-      let text = try await readLogs(id)
-      guard generation == logGeneration, route == .container(id), !Task.isCancelled, !logsPaused
-      else { return }
-      logs = text
-      logError = nil
-      logsDate = Date()
+      for try await chunk in streamLogs(id) {
+        guard valid() else { return }
+        let text = (current ?? "") + chunk
+        // Keep the newest lines so a chatty container can't grow memory unbounded.
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        current =
+          lines.count > Self.logLineLimit
+          ? lines.suffix(Self.logLineLimit).joined(separator: "\n") : text
+        logs = current ?? ""
+        logError = nil
+        logsDate = Date()
+        logsLoading = false
+        logsLive = true
+      }
     } catch is CancellationError {} catch {
       guard generation == logGeneration, route == .container(id), !Task.isCancelled else { return }
       logError = error.localizedDescription
     }
   }
+  package static let logLineLimit = 5_000
   package func loadDetails(_ id: String) async {
     guard route == .container(id) else { return }
     detailsGeneration += 1

@@ -89,8 +89,9 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
 - Start, stop and restart containers or displayed project groups, with confirmation.
 - Open a container page for Overview, Logs, Ports and Mounts. Use Back to return
   to the originating list and its filters.
-- Read the last 200 log lines, pause refresh, follow the latest output, search
-  and copy the displayed text. Refresh is bounded polling, not an unlimited stream.
+- Follow logs live: the last 500 lines, then new output as it arrives, keeping up
+  to 5,000 lines. Pause, scroll with the latest output, search and copy the
+  displayed text.
 - Inspect published port bindings and copy their addresses. TCP doesn't identify
   an HTTP service, so database ports don't get an inferred browser URL.
 - Inspect named and anonymous volumes and their container mount destinations. References include
@@ -106,9 +107,10 @@ after a lifecycle action, on explicit Refresh, and every 30 seconds while Overvi
 is active. CPU and memory history keeps up to 60 samples collected while the
 dashboard is open. Missing measurements remain unavailable.
 
-Only a visible, active Logs tab refreshes. Search pauses automatic following;
-Pause keeps the last buffer. A refresh error preserves that buffer and shows a
-separate error with its fetch time. Ports requires an explicit HTTP or HTTPS choice
+Only a visible, active Logs tab streams. Leaving the tab, pausing or switching
+apps stops the `docker logs --follow` process. A restarted container is followed
+again once it runs. Search pauses automatic scrolling; Pause keeps the last
+buffer. A stream error preserves that buffer and shows a separate error. Ports requires an explicit HTTP or HTTPS choice
 when opening a web endpoint.
 
 ### Inspect images

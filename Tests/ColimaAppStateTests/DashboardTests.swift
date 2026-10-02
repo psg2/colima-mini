@@ -57,20 +57,41 @@ private actor ResultGate<Value> {
     XCTAssertFalse(model.refreshing)
   }
   func testOldLogsCannotReplaceNewContainerPage() async throws {
-    let gate = ResultGate<String>()
-    let model = Dashboard(backend: backend(), readLogs: { _ in try await gate.read() })
+    var continuations: [String: AsyncThrowingStream<String, Error>.Continuation] = [:]
+    let model = Dashboard(
+      backend: backend(),
+      streamLogs: { id in AsyncThrowingStream { continuations[id] = $0 } })
     model.openContainer("abc123")
-    let oldLogs = Task { await model.loadLogs("abc123") }
-    await gate.waitForReaders(1)
+    let oldLogs = Task { await model.followLogs("abc123") }
+    while continuations["abc123"] == nil { await Task.yield() }
     model.openContainer("def456")
-    let newLogs = Task { await model.loadLogs("def456") }
-    await gate.waitForReaders(2)
-    await gate.finish(1, with: "current container log")
-    await newLogs.value
-    await gate.finish(0, with: "old container log")
+    let newLogs = Task { await model.followLogs("def456") }
+    while continuations["def456"] == nil { await Task.yield() }
+    continuations["def456"]?.yield("current container log")
+    continuations["abc123"]?.yield("old container log")
+    continuations["abc123"]?.finish()
     await oldLogs.value
+    continuations["def456"]?.finish()
+    await newLogs.value
     XCTAssertEqual(model.logs, "current container log")
     XCTAssertFalse(model.logsLoading)
+    XCTAssertFalse(model.logsLive)
+  }
+  func testFollowedLogsKeepOnlyTheNewestLines() async throws {
+    let lines = (1...(Dashboard.logLineLimit + 10)).map { "line \($0)" }
+    let model = Dashboard(
+      backend: backend(),
+      streamLogs: { _ in
+        AsyncThrowingStream {
+          for line in lines { $0.yield(line + "\n") }
+          $0.finish()
+        }
+      })
+    model.openContainer("abc123")
+    await model.followLogs("abc123")
+    let kept = model.logs.split(separator: "\n")
+    XCTAssertEqual(kept.last, "line \(Dashboard.logLineLimit + 10)")
+    XCTAssertLessThanOrEqual(kept.count, Dashboard.logLineLimit)
   }
   func testBackRestoresProjectSearchCollapseAndScrollContext() async throws {
     let model = Dashboard(backend: backend())
@@ -123,14 +144,17 @@ private actor ResultGate<Value> {
   }
   func testLogErrorsRetainLastGoodBufferAndPauseDoesNotReplaceIt() async throws {
     let model = Dashboard(
-      backend: backend(), readLogs: { _ in throw AppError.message("Daemon unavailable") })
+      backend: backend(),
+      streamLogs: { _ in
+        AsyncThrowingStream { $0.finish(throwing: AppError.message("Daemon unavailable")) }
+      })
     model.openContainer("abc123")
     model.logs = "last good log"
-    await model.loadLogs("abc123")
+    await model.followLogs("abc123")
     XCTAssertEqual(model.logs, "last good log")
     XCTAssertEqual(model.logError, "Daemon unavailable")
     model.logsPaused = true
-    await model.loadLogs("abc123")
+    await model.followLogs("abc123")
     XCTAssertEqual(model.logs, "last good log")
     XCTAssertFalse(model.logsLoading)
   }

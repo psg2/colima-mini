@@ -46,14 +46,7 @@ package final class Command: @unchecked Sendable {
     let child = Process()
     child.executableURL = URL(fileURLWithPath: executable)
     child.arguments = arguments
-    var env = ProcessInfo.processInfo.environment
-    env.removeValue(forKey: "DOCKER_HOST")
-    env.removeValue(forKey: "DOCKER_CONTEXT")
-    env.merge(environment, uniquingKeysWith: { _, new in new })
-    // Apps opened from Finder inherit launchd's minimal PATH. Colima runs limactl
-    // by name, so the child needs the Homebrew directories too.
-    env["PATH"] = Toolchain.searchPath(environment: env)
-    child.environment = env
+    child.environment = Self.childEnvironment(environment)
     child.standardInput = FileHandle.nullDevice
     child.standardOutput = output
     child.standardError = outputPolicy == .combined ? output : errors
@@ -116,6 +109,75 @@ package final class Command: @unchecked Sendable {
     }
     return text
   }
+  static func childEnvironment(_ environment: [String: String]) -> [String: String] {
+    var env = ProcessInfo.processInfo.environment
+    env.removeValue(forKey: "DOCKER_HOST")
+    env.removeValue(forKey: "DOCKER_CONTEXT")
+    env.merge(environment, uniquingKeysWith: { _, new in new })
+    // Apps opened from Finder inherit launchd's minimal PATH. Colima runs limactl
+    // by name, so the child needs the Homebrew directories too.
+    env["PATH"] = Toolchain.searchPath(environment: env)
+    return env
+  }
+  // Output of a long-running command as it arrives, stdout and stderr in one
+  // pipe so their order is kept. Ending the iteration terminates the child.
+  package static func stream(
+    _ executable: String, _ arguments: [String], environment: [String: String] = [:]
+  ) -> AsyncThrowingStream<String, Error> {
+    AsyncThrowingStream { continuation in
+      guard FileManager.default.isExecutableFile(atPath: executable) else {
+        continuation.finish(
+          throwing: AppError.message(
+            "Missing \(URL(fileURLWithPath: executable).lastPathComponent). Install the required command-line tools first."
+          ))
+        return
+      }
+      let child = Process()
+      let pipe = Pipe()
+      let tail = TailBuffer()
+      child.executableURL = URL(fileURLWithPath: executable)
+      child.arguments = arguments
+      child.environment = childEnvironment(environment)
+      child.standardInput = FileHandle.nullDevice
+      child.standardOutput = pipe
+      child.standardError = pipe
+      pipe.fileHandleForReading.readabilityHandler = { handle in
+        let data = handle.availableData
+        guard !data.isEmpty else { return }
+        let text = String(decoding: data, as: UTF8.self)
+        tail.append(text)
+        continuation.yield(text)
+      }
+      child.terminationHandler = { process in
+        pipe.fileHandleForReading.readabilityHandler = nil
+        // Drain anything written just before exit.
+        let rest = (try? pipe.fileHandleForReading.readToEnd()) ?? nil
+        if let rest, !rest.isEmpty {
+          let text = String(decoding: rest, as: UTF8.self)
+          tail.append(text)
+          continuation.yield(text)
+        }
+        if process.terminationStatus == 0 || process.terminationReason == .uncaughtSignal {
+          continuation.finish()
+        } else {
+          let message = tail.text.trimmingCharacters(in: .whitespacesAndNewlines)
+          continuation.finish(
+            throwing: AppError.message(
+              message.isEmpty
+                ? "Command failed with exit code \(process.terminationStatus)." : message))
+        }
+      }
+      continuation.onTermination = { _ in
+        guard child.isRunning else { return }
+        child.terminate()
+        let pid = child.processIdentifier
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+          if child.isRunning { kill(pid, SIGKILL) }
+        }
+      }
+      do { try child.run() } catch { continuation.finish(throwing: error) }
+    }
+  }
   package static func run(
     _ executable: String, _ arguments: [String], timeout: Double = 15,
     environment: [String: String] = [:], outputPolicy: OutputPolicy = .stdout
@@ -130,5 +192,21 @@ package final class Command: @unchecked Sendable {
     } onCancel: {
       command.cancel()
     }
+  }
+}
+
+// The last output of a stream, used as its error message when it fails.
+private final class TailBuffer: @unchecked Sendable {
+  private let lock = NSLock()
+  private var value = ""
+  func append(_ text: String) {
+    lock.lock()
+    value = String((value + text).suffix(2_000))
+    lock.unlock()
+  }
+  var text: String {
+    lock.lock()
+    defer { lock.unlock() }
+    return value
   }
 }
