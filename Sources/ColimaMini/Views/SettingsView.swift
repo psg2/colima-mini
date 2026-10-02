@@ -16,6 +16,8 @@ struct SettingsView: View {
   @State private var confirming = false
   @State private var loginEnabled = SMAppService.mainApp.status == .enabled
   @State private var loginError: String?
+  @State private var folderApp = ExternalApps.folderDefault?.id ?? ""
+  @State private var terminalApp = ExternalApps.terminal?.id ?? ""
   private var loginItem: Binding<Bool> {
     Binding(
       get: { loginEnabled },
@@ -66,7 +68,7 @@ struct SettingsView: View {
         Text("Disk")
         Spacer()
         Text(
-          Int(disk) == configured
+          verbatim: Int(disk) == configured
             ? "\(configured) GiB of \(ResourceSettings.hostDisk) GiB"
             : "\(configured) → \(Int(disk)) GiB"
         ).monospacedDigit()
@@ -80,6 +82,41 @@ struct SettingsView: View {
         "Colima grows the data disk on the next start and can't shrink it. The disk image is sparse, so it only occupies what containers write."
       ).font(.caption).foregroundStyle(.secondary).fixedSize(
         horizontal: false, vertical: true)
+    }
+  }
+  private var appPickers: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Picker("Open project folders with", selection: $folderApp) {
+        ForEach(ExternalApps.installed) { app in
+          Label {
+            Text(app.name)
+          } icon: {
+            Image(nsImage: app.icon)
+          }.tag(app.id)
+        }
+      }
+      .onChange(of: folderApp) { _, id in
+        if let app = ExternalApps.installed.first(where: { $0.id == id }) {
+          ExternalApps.setFolderDefault(app)
+        }
+      }
+      Picker("Terminal for shells", selection: $terminalApp) {
+        ForEach(ExternalApps.terminals) { app in
+          Label {
+            Text(app.name)
+          } icon: {
+            Image(nsImage: app.icon)
+          }.tag(app.id)
+        }
+      }
+      .onChange(of: terminalApp) { _, id in
+        if let app = ExternalApps.terminals.first(where: { $0.id == id }) {
+          ExternalApps.setTerminal(app)
+        }
+      }
+      Text(
+        "Open uses the folder app with one click; picking another app from its menu makes that the default. Shell opens `docker exec` in the terminal."
+      ).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
   }
   private var currentVM: String? {
@@ -181,6 +218,7 @@ struct SettingsView: View {
           Text("Applying resources…").font(.caption)
         }
       }
+      GroupBox("Apps") { appPickers.padding(10) }
       GroupBox("Dashboard") {
         VStack(alignment: .leading, spacing: 12) {
           HStack {
@@ -228,7 +266,9 @@ struct SettingsView: View {
         }
       } message: {
         Text(
-          "Use \(Int(cpus)) CPUs and \(String(format: "%.1f", memory)) GiB. Running containers will be interrupted while the VM restarts."
+          "Use \(Int(cpus)) CPUs and \(String(format: "%.1f", memory)) GiB"
+            + (proposed.diskGiB.map { " with a \($0) GiB disk" } ?? "")
+            + ". Running containers will be interrupted while the VM restarts."
         )
       }
   }

@@ -81,39 +81,37 @@ extension ProjectOrigin.Kind {
 }
 
 @MainActor enum Launcher {
-  private static let editors = [
-    ("Visual Studio Code", "com.microsoft.VSCode"), ("Cursor", "com.todesktop.230313mzl4w4u92"),
-    ("Zed", "dev.zed.Zed"),
-  ]
-  static var editor: (name: String, url: URL)? {
-    for (name, identifier) in editors {
-      if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier) {
-        return (name, url)
-      }
-    }
-    return nil
-  }
   static func copy(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
   }
   static func shell(_ container: Container, model: Dashboard) {
     guard !model.sample, container.running else { return }
+    guard let terminal = ExternalApps.terminal else {
+      model.error = "No terminal app is installed."
+      return
+    }
     do {
       let docker = try model.backend.toolchain.executable("docker")
-      NSWorkspace.shared.open(
-        try ShellScript.write(ShellScript.container(docker: docker, id: container.id)))
+      try ExternalApps.run(ShellScript.container(docker: docker, id: container.id), in: terminal)
     } catch { model.error = "Could not open a shell: " + error.localizedDescription }
   }
-  static func terminal(_ folder: URL, model: Dashboard) {
-    do {
-      NSWorkspace.shared.open(try ShellScript.write(ShellScript.folder(folder.path)))
-    } catch { model.error = "Could not open Terminal: " + error.localizedDescription }
+  static func open(_ origin: ProjectOrigin, with app: ExternalApp, model: Dashboard) {
+    ExternalApps.setFolderDefault(app)
+    do { try ExternalApps.open(origin.url, with: app) } catch {
+      model.error = "Could not open \(app.name): " + error.localizedDescription
+    }
   }
-  static func edit(_ folder: URL) {
-    guard let editor else { return }
-    NSWorkspace.shared.open(
-      [folder], withApplicationAt: editor.url, configuration: NSWorkspace.OpenConfiguration())
+  static func openRepository(_ origin: ProjectOrigin, model: Dashboard) {
+    Task {
+      do {
+        guard let url = try await model.backend.repositoryURL(folder: origin.path) else {
+          model.error = "\(origin.displayPath) has no origin remote with a web page."
+          return
+        }
+        NSWorkspace.shared.open(url)
+      } catch { model.error = "Could not read the Git remote: " + error.localizedDescription }
+    }
   }
 }
 
@@ -123,12 +121,59 @@ struct OriginMenuItems: View {
   let origin: ProjectOrigin
   var body: some View {
     let available = origin.exists() && !model.sample
-    Button("Open in Finder") { NSWorkspace.shared.open(origin.url) }.disabled(!available)
-    Button("Open in Terminal") { Launcher.terminal(origin.url, model: model) }
-      .disabled(!available)
-    if let editor = Launcher.editor {
-      Button("Open in \(editor.name)") { Launcher.edit(origin.url) }.disabled(!available)
+    if !origin.exists() {
+      Text("Folder deleted: " + origin.displayPath)
+    }
+    let apps = ExternalApps.installed
+    let preferred = ExternalApps.folderDefault
+    ForEach([preferred].compactMap { $0 } + apps.filter { $0 != preferred }) { app in
+      Button {
+        Launcher.open(origin, with: app, model: model)
+      } label: {
+        Label {
+          Text(app == preferred ? "\(app.name) (default)" : app.name)
+        } icon: {
+          Image(nsImage: app.icon)
+        }
+      }.disabled(!available)
+    }
+    Divider()
+    if FileManager.default.fileExists(atPath: origin.url.appendingPathComponent(".git").path) {
+      Button("Open repository in browser") { Launcher.openRepository(origin, model: model) }
+        .disabled(!available)
     }
     Button("Copy folder path") { Launcher.copy(origin.path) }
+  }
+}
+
+// Opens the project folder in the default app with one click; the menu picks
+// another app, which becomes the default.
+struct OpenFolderButton: View {
+  @ObservedObject var model: Dashboard
+  let origin: ProjectOrigin
+  var body: some View {
+    let preferred = ExternalApps.folderDefault
+    Menu {
+      OriginMenuItems(model: model, origin: origin)
+    } label: {
+      if let preferred {
+        Label {
+          Text("Open")
+        } icon: {
+          Image(nsImage: preferred.icon)
+        }
+      } else {
+        Label("Open", systemImage: "folder")
+      }
+    } primaryAction: {
+      if let preferred, origin.exists(), !model.sample {
+        Launcher.open(origin, with: preferred, model: model)
+      }
+    }
+    .fixedSize()
+    .help(
+      origin.exists()
+        ? "Open \(origin.displayPath)" + (preferred.map { " in \($0.name)" } ?? "")
+        : "Folder deleted: \(origin.displayPath)")
   }
 }
