@@ -9,6 +9,7 @@ package enum AppRoute: Hashable {
   case volume(String)
   case images
   case image(String)
+  case networks
   case storage
   case settings
 
@@ -19,6 +20,7 @@ package enum AppRoute: Hashable {
     case .containers: return "containers"
     case .volumes: return "volumes"
     case .images: return "images"
+    case .networks: return "networks"
     case .storage: return "storage"
     default: return nil
     }

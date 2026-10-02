@@ -81,6 +81,7 @@ struct DashboardView: View {
     case .volumes: VolumesView(model: model)
     case .volume(let name): VolumeDetailView(model: model, name: name)
     case .images: ImagesView(model: model)
+    case .networks: NetworksView(model: model)
     case .image(let id): ImageDetailView(model: model, id: id)
     case .storage: StorageView(model: model)
     case .settings:

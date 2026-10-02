@@ -14,6 +14,12 @@
   "environment": {
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": ["POSTGRES_USER=demo", "POSTGRES_PASSWORD=sample-password", "POSTGRES_DB=demo", "DATABASE_URL=postgres://demo:sample-password@localhost:5432/demo", "PGDATA=/var/lib/postgresql/data", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG=en_US.utf8"]
   },
+  "networks": [
+    {"Id": "n1", "Name": "bridge", "Driver": "bridge", "Scope": "local", "Internal": false, "Created": "2026-10-01T10:00:00.000000000Z", "IPAM": {"Config": [{"Subnet": "172.17.0.0/16", "Gateway": "172.17.0.1"}]}, "Containers": {}, "Labels": {}},
+    {"Id": "n2", "Name": "demo_default", "Driver": "bridge", "Scope": "local", "Internal": false, "Created": "2026-10-02T07:00:00.000000000Z", "IPAM": {"Config": [{"Subnet": "172.19.0.0/16", "Gateway": "172.19.0.1"}]}, "Containers": {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {"Name": "demo-web-1", "IPv4Address": "172.19.0.3/16"}, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {"Name": "demo-postgres-1", "IPv4Address": "172.19.0.2/16"}}, "Labels": {"com.docker.compose.project": "demo", "com.docker.compose.network": "default"}},
+    {"Id": "n3", "Name": "old_default", "Driver": "bridge", "Scope": "local", "Internal": false, "Created": "2026-09-20T07:00:00.000000000Z", "IPAM": {"Config": [{"Subnet": "172.21.0.0/16"}]}, "Containers": {}, "Labels": {"com.docker.compose.project": "old"}},
+    {"Id": "n4", "Name": "host", "Driver": "host", "Scope": "local", "Internal": false, "IPAM": {"Config": []}, "Containers": {}, "Labels": {}}
+  ],
   "details": {
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
       "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

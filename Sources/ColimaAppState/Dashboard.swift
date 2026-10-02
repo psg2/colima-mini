@@ -81,6 +81,10 @@ package struct PendingAction: Identifiable {
   @Published package var detailsError: String?
   @Published package var detailsLoading = false
   @Published package var detailsDate: Date?
+  @Published package var networks: [DockerNetwork] = []
+  @Published package var networksError: String?
+  @Published package var networksLoading = false
+  @Published package var networkSearch = ""
   @Published package var volumes: [Volume] = []
   @Published package var volumesError: String?
   @Published package var volumesLoading = false
@@ -139,7 +143,7 @@ package struct PendingAction: Identifiable {
   }
   package func restoreLastSection() {
     guard !sample, let name = UserDefaults.standard.string(forKey: "lastSection") else { return }
-    let sections: [AppRoute] = [.overview, .containers, .volumes, .images, .storage]
+    let sections: [AppRoute] = [.overview, .containers, .volumes, .images, .networks, .storage]
     if let section = sections.first(where: { $0.sectionName == name }) { route = section }
   }
   package var sample: Bool { backend.fixture != nil }
@@ -397,6 +401,25 @@ package struct PendingAction: Identifiable {
         detailsError = error.localizedDescription
       }
     }
+  }
+  package func loadNetworks() async {
+    guard !networksLoading else { return }
+    networksLoading = true
+    defer { networksLoading = false }
+    do {
+      networks = try await backend.networks()
+      networksError = nil
+    } catch { networksError = error.localizedDescription }
+  }
+  package func removeNetwork(_ network: DockerNetwork) async {
+    guard !busy, !sample else { return }
+    busy = true
+    do {
+      try await backend.removeNetwork(network)
+      networksError = nil
+    } catch { networksError = "Could not remove \(network.name): " + error.localizedDescription }
+    busy = false
+    await loadNetworks()
   }
   package func loadVolumes() async {
     guard !volumesLoading else { return }
