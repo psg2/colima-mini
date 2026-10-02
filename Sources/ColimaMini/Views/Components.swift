@@ -32,6 +32,7 @@ struct ConditionPill: View {
 // browser stays an explicit protocol choice.
 struct PortChip: View {
   let port: PublishedPort
+  var compact = false
   var body: some View {
     Menu {
       Button("Copy \(port.address)") { Launcher.copy(port.address) }
@@ -41,7 +42,7 @@ struct PortChip: View {
         Button("Open as HTTPS") { port.url(scheme: "https").map { NSWorkspace.shared.open($0) } }
       }
     } label: {
-      Text(port.label).font(.system(.caption2, design: .monospaced))
+      Text(compact ? ":\(port.hostPort)" : port.label).font(.system(.caption2, design: .monospaced))
     } primaryAction: {
       Launcher.copy(port.address)
     }
@@ -58,9 +59,10 @@ struct PortChip: View {
 struct PortChips: View {
   let ports: [PublishedPort]
   var limit = 3
+  var compact = false
   var body: some View {
     HStack(spacing: 4) {
-      ForEach(ports.prefix(limit)) { PortChip(port: $0) }
+      ForEach(ports.prefix(limit)) { PortChip(port: $0, compact: compact) }
       if ports.count > limit {
         Text("+\(ports.count - limit)").font(.caption2).foregroundStyle(.secondary)
           .help(ports.dropFirst(limit).map(\.label).joined(separator: ", "))

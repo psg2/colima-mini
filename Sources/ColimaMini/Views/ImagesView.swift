@@ -19,6 +19,8 @@ struct ImagesView: View {
             .secondary)
         }
         Spacer()
+        Button("Reclaim space…") { model.openReclaim() }
+          .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
         RefreshButton(busy: model.imagesLoading) { await model.loadImages() }
       }
       TextField("Filter images", text: $model.imageSearch).textFieldStyle(.roundedBorder)

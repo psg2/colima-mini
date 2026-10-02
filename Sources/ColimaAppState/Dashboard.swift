@@ -9,6 +9,8 @@ package struct PendingAction: Identifiable {
   package let verb: String
   package let containers: [Container]
   package let vm: Bool
+  // The confirmation button's title.
+  package var label: String { verb == "rm" ? "Remove" : verb.capitalized }
   package init(title: String, message: String, verb: String, containers: [Container], vm: Bool) {
     self.title = title
     self.message = message
@@ -450,15 +452,20 @@ package struct PendingAction: Identifiable {
     if !images.isEmpty { await loadImages() }
   }
   package func request(_ verb: String, containers: [Container], vm: Bool = false) {
+    // Removal never forces: only stopped containers are offered, and Docker
+    // refuses one that started since.
+    let containers = verb == "rm" ? containers.filter { !$0.running } : containers
     guard !sample, !busy, vm || !containers.isEmpty else { return }
     let targets =
       vm
       ? "Colima" : (containers.count == 1 ? containers[0].name : "\(containers.count) containers")
     pending = PendingAction(
-      title: "\(verb.capitalized) \(targets)?",
+      title: "\(verb == "rm" ? "Remove" : verb.capitalized) \(targets)?",
       message: vm
         ? "This affects every container in Colima. Your Docker volumes are kept."
-        : containers.map(\.name).joined(separator: "\n"),
+        : containers.map(\.name).joined(separator: "\n")
+          + (verb == "rm"
+            ? "\n\nIts logs and container files are deleted. Volumes are kept." : ""),
       verb: verb, containers: containers, vm: vm)
   }
   package func perform(_ action: PendingAction) async {
@@ -479,7 +486,13 @@ package struct PendingAction: Identifiable {
     } catch { actionError = error.localizedDescription }
     busy = false
     await refresh()
-    if case .container(let id) = route { await loadDetails(id) }
+    if case .container(let id) = route {
+      if action.verb == "rm", !containers.contains(where: { $0.id == id }) {
+        goBack()
+      } else {
+        await loadDetails(id)
+      }
+    }
     if let actionError { error = actionError }
   }
   package func changeResources(_ resources: ResourceSettings, restart: Bool) async {

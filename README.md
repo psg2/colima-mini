@@ -81,6 +81,11 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
 - Each project shows where Compose ran it. Claude, Codex, Conductor and Orca
   worktrees are labeled, and a project whose folder was removed shows
   **Folder missing**. Open the folder in Finder, Terminal or a detected editor.
+- The status bar shows container CPU and memory against the VM allocation and the
+  Docker data disk. The menu bar adds per-project CPU and memory and disk use.
+- Remove a stopped container from its row, menu or page. Running containers aren't
+  offered, and removal keeps volumes. The container page also shows network and
+  disk I/O and process count.
 - Rows show health, uptime and published ports. Click a port to copy
   `localhost:PORT`; its menu opens HTTP or HTTPS explicitly. Hover a row for Logs,
   Shell and Restart, or right-click for every action.

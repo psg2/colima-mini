@@ -66,6 +66,8 @@ struct ContainerRow: View {
       } else {
         iconButton("Start…", "play") { model.request("start", containers: [container]) }
           .disabled(model.busy || model.sample)
+        iconButton("Remove…", "trash") { model.request("rm", containers: [container]) }
+          .disabled(model.busy || model.sample)
       }
     }
   }
@@ -92,6 +94,7 @@ struct ContainerMenuItems: View {
       Button("Stop…") { model.request("stop", containers: [container]) }
     } else {
       Button("Start…") { model.request("start", containers: [container]) }
+      Button("Remove…") { model.request("rm", containers: [container]) }
     }
     Divider()
     Button("Copy name") { Launcher.copy(container.name) }
