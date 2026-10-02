@@ -92,6 +92,9 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
 - Follow logs live: the last 500 lines, then new output as it arrives, keeping up
   to 5,000 lines. Pause, scroll with the latest output, search and copy the
   displayed text.
+- Follow a whole project with **Logs** on its page, **Show logs** in its menu or
+  Command+K. Each line names its service, and **Services** hides the ones you
+  don't need.
 - Inspect published port bindings and copy their addresses. TCP doesn't identify
   an HTTP service, so database ports don't get an inferred browser URL.
 - Inspect named and anonymous volumes and their container mount destinations. References include

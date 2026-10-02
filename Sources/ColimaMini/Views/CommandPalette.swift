@@ -54,6 +54,14 @@ struct CommandPalette: View {
             id: "action.reclaim", title: "Reclaim space…", subtitle: "Action · preview first",
             symbol: "sparkles", run: { model.openReclaim() }))
       }
+      values += (model.snapshot?.projects ?? []).filter { project in
+        model.containers.contains { $0.project == project && $0.running }
+      }.map { project in
+        PaletteResult(
+          id: "projectLogs." + project, title: "Show logs: " + project,
+          subtitle: "Project action", symbol: "text.alignleft",
+          run: { model.openProjectLogs(project) })
+      }
       values += actions
     }
     return values.filter {

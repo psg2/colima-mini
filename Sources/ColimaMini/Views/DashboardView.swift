@@ -67,6 +67,8 @@ struct DashboardView: View {
     case .overview: OverviewView(model: model)
     case .containers: ContainersView(model: model)
     case .container(let id): ContainerDetailView(model: model, id: id).id(id)
+    case .projectLogs(let project):
+      ProjectLogsView(model: model, project: project).id(project)
     case .volumes: VolumesView(model: model)
     case .volume(let name): VolumeDetailView(model: model, name: name)
     case .images: ImagesView(model: model)
@@ -94,6 +96,13 @@ struct ContainersView: View {
         }
         Spacer()
         if model.project != "All containers" {
+          if model.visible.contains(where: \.running) {
+            Button {
+              model.openProjectLogs(model.project)
+            } label: {
+              Label("Logs", systemImage: "text.alignleft")
+            }.accessibilityIdentifier("project.logs")
+          }
           ProjectActions(model: model, containers: model.visible)
         }
         RefreshButton(busy: model.refreshing || model.busy) { await model.refresh() }
