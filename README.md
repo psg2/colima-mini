@@ -105,7 +105,9 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
 - Inspect named and anonymous volumes and their container mount destinations. References include
   stopped containers; an unattached volume isn't automatically safe to delete.
 - Open Storage for disk measurements, **Reclaim space** and **Review unused
-  containers**. The unused-container scanner only produces a report.
+  containers**. The scan groups containers by project, explains each verdict
+  (deleted worktree, stopped for over a day, idle, in use) and offers **Stop**
+  or **Remove…** per group, with confirmation. The scan itself changes nothing.
 - Change CPU, RAM and refresh interval in Settings.
 
 ### Diagnose a container

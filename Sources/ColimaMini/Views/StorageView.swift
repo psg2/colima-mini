@@ -108,8 +108,10 @@ struct StorageView: View {
         HStack {
           VStack(alignment: .leading, spacing: 5) {
             Text("Unused containers").font(.headline)
-            Text("Review candidates and their reasons. The report keeps containers and volumes.")
-              .font(.caption).foregroundStyle(.secondary)
+            Text(
+              "Find stacks whose worktree was deleted and containers that are stopped or idle, then stop or remove them. Volumes are kept."
+            )
+            .font(.caption).foregroundStyle(.secondary)
           }
           Spacer()
           Button("Review unused containers") { Task { await model.scan() } }

@@ -49,7 +49,9 @@ struct DashboardView: View {
     .sheet(isPresented: $palette) { CommandPalette(model: model, presented: $palette) }
     .confirmationDialog(
       model.pending?.title ?? "Confirm action",
-      isPresented: Binding(get: { model.pending != nil }, set: { if !$0 { model.pending = nil } }),
+      isPresented: Binding(
+        get: { model.pending != nil && !model.showingSweep },
+        set: { if !$0 { model.pending = nil } }),
       titleVisibility: .visible
     ) {
       if let action = model.pending {
@@ -60,7 +62,7 @@ struct DashboardView: View {
     } message: {
       Text(model.pending?.message ?? "")
     }
-    .sheet(isPresented: $model.showingSweep) { CleanupReportView(model: model) }
+    .sheet(isPresented: $model.showingSweep) { UnusedContainersView(model: model) }
     .sheet(isPresented: $model.showingReclaim) { ReclaimView(model: model) }
     .task {
       await model.refresh()

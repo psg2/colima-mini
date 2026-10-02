@@ -57,7 +57,9 @@ package struct PendingAction: Identifiable {
   // True while new output is arriving; false once the stream ended or failed.
   @Published package var logsLive = false
   @Published package var logsDate: Date?
-  @Published package var sweepReport = "Run a scan to find orphaned, stale or idle containers."
+  @Published package var sweepGroups: [SweepGroup]?
+  @Published package var sweepError: String?
+  @Published package var sweptAt: Date?
   @Published package var scanning = false
   @Published package var showingSweep = false
   @Published package var pending: PendingAction?
@@ -522,8 +524,19 @@ package struct PendingAction: Identifiable {
     scanning = true
     showingSweep = true
     defer { scanning = false }
-    do { sweepReport = try await backend.sweep() } catch {
-      sweepReport = "Scan failed: " + error.localizedDescription
+    sweepError = nil
+    do {
+      sweepGroups = try await backend.unusedContainers()
+      sweptAt = Date()
+    } catch {
+      sweepError = "Scan failed: " + error.localizedDescription
+    }
+  }
+  // The group's containers as they are now, so a row reflects actions taken
+  // since the scan and drops out once its containers are gone.
+  package func members(of group: SweepGroup) -> [Container] {
+    containers.filter { container in
+      group.containerIDs.contains { $0.hasPrefix(container.id) || container.id.hasPrefix($0) }
     }
   }
 }

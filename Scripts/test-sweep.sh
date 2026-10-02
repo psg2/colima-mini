@@ -71,6 +71,20 @@ grep -Eq '^recent +fresh-pg' <<<"$output" || fail "container that logged 10 minu
 grep -Eq '^stale +stale-proj' <<<"$output" || fail "stack stopped 8 days ago not reported as stale"
 grep -Eq '^stopped +paused-pg' <<<"$output" || fail "container stopped 30 minutes ago not reported as stopped"
 
+output="$(sweep --json)"
+[[ ! -s "$log" ]] || fail "the JSON report changed containers"
+python3 - "$output" <<'PY' || fail "JSON report does not match the text verdicts"
+import json, sys
+groups = {g["name"]: g for g in json.loads(sys.argv[1])}
+assert groups["gone-proj"]["verdict"] == "orphan" and groups["gone-proj"]["project"] == "gone-proj"
+assert groups["gone-proj"]["containers"] == ["orphan000001"]
+assert groups["old-proj"]["verdict"] == "idle"
+assert groups["stale-proj"]["verdict"] == "stale"
+assert groups["paused-pg"]["verdict"] == "stopped" and groups["paused-pg"]["project"] is None
+PY
+if sweep --json --apply >/dev/null 2>&1; then fail "--json --apply was accepted"; fi
+[[ ! -s "$log" ]] || fail "--json --apply changed containers"
+
 output="$(sweep --apply)"
 expected="$(printf '%s\n' 'rm -f orphan000001' 'network rm net-gone' 'rm -f stale0000001' 'network rm net-stale' 'stop idle00000001')"
 [[ "$(cat "$log")" == "$expected" ]] || { output="$(cat "$log")"; fail "--apply did not remove only orphan and stale groups and stop only the idle one"; }
