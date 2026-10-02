@@ -248,7 +248,8 @@ containers first, then expandable projects with ports, shells and actions.
 When a container exits unexpectedly, starts failing its health check or enters a
 restart loop, the app sends a notification; clicking it opens the logs. Changes
 made from Colima Mini don't notify, and exit code 143 (a normal `docker stop`)
-is ignored. Turn this off or open the app at login in Settings. Refresh slows to
+is ignored. Turn this off or open the app at login in Settings; a launch at login
+starts in the menu bar without opening the dashboard. Refresh slows to
 at most every 30 seconds while another app is in front.
 Closing the dashboard keeps the menu bar available. Quitting Colima Mini leaves Colima running.
 Docker operations explicitly select the `colima` context; a foreign terminal
