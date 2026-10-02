@@ -85,7 +85,6 @@ struct SettingsView: View {
   private var currentVM: String? {
     guard let vm = model.snapshot?.vm else { return nil }
     return "Current VM: " + vm.allocation
-      + (vm.disk.map { " · " + bytesText(Double($0)) + " disk" } ?? "")
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {

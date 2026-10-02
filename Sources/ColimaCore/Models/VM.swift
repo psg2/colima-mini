@@ -10,6 +10,8 @@ package struct VM: Decodable {
   package var runtime: String? = nil
   package var running: Bool { status.lowercased() == "running" }
   package var allocation: String {
-    "\(cpus) CPUs · \(String(format: "%g", Double(memory) / 1_073_741_824)) GiB allocated"
+    let memory = String(format: "%g", Double(memory) / 1_073_741_824)
+    let disk = disk.map { " · \(String(format: "%g", Double($0) / 1_073_741_824)) GiB disk" } ?? ""
+    return "\(cpus) CPUs · \(memory) GiB" + disk
   }
 }
