@@ -39,7 +39,8 @@ final class BackendTests: XCTestCase {
           elif args[0] == 'start':
               config = pathlib.Path(os.environ['COLIMA_TEST_CONFIG']).read_text()
               vm.update(status='Running', cpus=int(re.search(r'^cpu: ([0-9]+)', config, re.M)[1]),
-                        memory=int(float(re.search(r'^memory: ([0-9.]+)', config, re.M)[1]) * 2**30))
+                        memory=int(float(re.search(r'^memory: ([0-9.]+)', config, re.M)[1]) * 2**30),
+                        disk=int(re.search(r'^disk: ([0-9]+)', config, re.M)[1]) * 2**30)
               rows = [row for row in rows if row['ID'] != data.get('remove_on_start')]
           else:
               sys.exit('unsupported VM operation')
@@ -102,10 +103,11 @@ final class BackendTests: XCTestCase {
   func testResourceRestartRestoresOnlyPreviouslyRunningContainers() async throws {
     try await runtime { backend, config in
       let before = try await backend.snapshot()
-      let desired = ResourceSettings(cpus: 1, memoryGiB: 2.5)
+      let desired = ResourceSettings(cpus: 1, memoryGiB: 2.5, diskGiB: 120)
       try await backend.apply(desired, restart: true)
       let after = try await backend.snapshot()
       XCTAssertEqual(after.vm.cpus, 1)
+      XCTAssertEqual(after.vm.disk, 120 << 30)
       XCTAssertEqual(after.vm.memory, Int64(2.5 * 1_073_741_824))
       XCTAssertEqual(
         Set(after.containers.filter(\.running).map(\.id)),
@@ -116,7 +118,7 @@ final class BackendTests: XCTestCase {
   func testSaveForNextStartLeavesRunningAllocationUntouched() async throws {
     try await runtime { backend, _ in
       let before = try await backend.snapshot()
-      let desired = ResourceSettings(cpus: 1, memoryGiB: 2)
+      let desired = ResourceSettings(cpus: 1, memoryGiB: 2, diskGiB: 100)
       try await backend.apply(desired, restart: false)
       let after = try await backend.snapshot()
       XCTAssertEqual(try backend.settings(), desired)

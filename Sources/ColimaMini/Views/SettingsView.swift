@@ -10,6 +10,7 @@ struct SettingsView: View {
   @ObservedObject var model: Dashboard
   @State private var cpus = 10.0
   @State private var memory = 20.0
+  @State private var disk = 100.0
   @State private var saved: ResourceSettings?
   @State private var error: String?
   @State private var confirming = false
@@ -32,12 +33,22 @@ struct SettingsView: View {
         loginEnabled = SMAppService.mainApp.status == .enabled
       })
   }
-  var proposed: ResourceSettings { ResourceSettings(cpus: Int(cpus), memoryGiB: memory) }
+  var proposed: ResourceSettings {
+    ResourceSettings(
+      cpus: Int(cpus), memoryGiB: memory, diskGiB: saved?.diskGiB == nil ? nil : Int(disk))
+  }
+  // The disk can only grow, so the slider starts at the configured size.
+  private var diskRange: ClosedRange<Double> {
+    let minimum = Double(saved?.diskGiB ?? 1)
+    return minimum...max(minimum + 10, Double(ResourceSettings.hostDisk))
+  }
   var changed: Bool { saved != nil && proposed != saved }
   var differsFromVM: Bool {
     guard let vm = model.snapshot?.vm else { return false }
     return proposed.cpus != vm.cpus
       || abs(proposed.memoryGiB - Double(vm.memory) / 1_073_741_824) > 0.01
+      || (proposed.diskGiB != nil && vm.disk != nil
+        && Int64(proposed.diskGiB!) << 30 > vm.disk!)
   }
   func load() {
     do {
@@ -45,8 +56,36 @@ struct SettingsView: View {
       saved = value
       cpus = Double(value.cpus)
       memory = value.memoryGiB
+      disk = Double(value.diskGiB ?? 0)
       error = nil
     } catch { self.error = error.localizedDescription }
+  }
+  private func diskControl(_ configured: Int) -> some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack {
+        Text("Disk")
+        Spacer()
+        Text(
+          Int(disk) == configured
+            ? "\(configured) GiB of \(ResourceSettings.hostDisk) GiB"
+            : "\(configured) → \(Int(disk)) GiB"
+        ).monospacedDigit()
+      }
+      Slider(
+        value: Binding(get: { disk }, set: { disk = ($0 / 10).rounded() * 10 }),
+        in: diskRange
+      )
+      .accessibilityLabel("Disk in GiB").accessibilityIdentifier("settings.disk")
+      Text(
+        "Colima grows the data disk on the next start and can't shrink it. The disk image is sparse, so it only occupies what containers write."
+      ).font(.caption).foregroundStyle(.secondary).fixedSize(
+        horizontal: false, vertical: true)
+    }
+  }
+  private var currentVM: String? {
+    guard let vm = model.snapshot?.vm else { return nil }
+    return "Current VM: " + vm.allocation
+      + (vm.disk.map { " · " + bytesText(Double($0)) + " disk" } ?? "")
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
@@ -83,6 +122,7 @@ struct SettingsView: View {
             in: 1...Double(max(2, ResourceSettings.hostMemory))
           )
           .accessibilityLabel("Memory in GiB").accessibilityIdentifier("settings.memory")
+          if let configured = saved?.diskGiB { diskControl(configured) }
           HStack {
             Text("Presets").font(.caption).foregroundStyle(.secondary)
             Button("Light") {
@@ -100,7 +140,7 @@ struct SettingsView: View {
           }
           Divider()
           if let vm = model.snapshot?.vm {
-            Text("Current VM: " + vm.allocation).font(.caption).foregroundStyle(.secondary)
+            Text(currentVM ?? "").font(.caption).foregroundStyle(.secondary)
             if !changed && differsFromVM {
               Text("Saved changes are waiting for the next start.").font(.caption).foregroundStyle(
                 .orange)
@@ -167,7 +207,7 @@ struct SettingsView: View {
           }
         }.padding(10)
       }
-      Text("Context: colima · CPU and memory changes stay in your local Colima profile.")
+      Text("Context: colima · Resource changes stay in your local Colima profile.")
         .font(.caption).foregroundStyle(.secondary)
     }.padding(24).frame(width: 570)
       .onAppear { load() }

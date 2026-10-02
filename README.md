@@ -178,10 +178,12 @@ To print the preview without opening a window:
 
 ### Change VM resources
 
-**Save for next start** updates CPU and memory without interrupting the VM.
+**Save for next start** updates CPU, memory and disk size without interrupting the VM.
+The disk can only grow: Colima resizes it on the next start and can't shrink it,
+so the slider starts at the configured size.
 **Apply & restart…** asks for confirmation, restarts Colima, verifies its allocation,
 and restores the containers running immediately before Colima was stopped. Docker volumes are kept.
-Settings modify only root `cpu` and `memory` fields in the local profile, preserving
+Settings modify only root `cpu`, `memory` and `disk` fields in the local profile, preserving
 other settings, comments and permissions. The first original file is retained as
 `colima.yaml.mini-backup` beside the profile.
 

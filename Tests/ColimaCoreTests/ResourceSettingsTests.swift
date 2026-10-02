@@ -30,8 +30,9 @@ final class ResourceSettingsTests: XCTestCase {
   func testFractionalRAMAndPreservationOfOtherConfiguration() throws {
     try withConfig { config in
       XCTAssertEqual(
-        try ResourceSettings.read(from: config), ResourceSettings(cpus: 2, memoryGiB: 4.5))
-      let desired = ResourceSettings(cpus: 2, memoryGiB: 2.5)
+        try ResourceSettings.read(from: config),
+        ResourceSettings(cpus: 2, memoryGiB: 4.5, diskGiB: 100))
+      let desired = ResourceSettings(cpus: 2, memoryGiB: 2.5, diskGiB: 100)
       try desired.save(to: config)
       XCTAssertEqual(try ResourceSettings.read(from: config), desired)
       let expected = original.replacingOccurrences(of: "memory: 4.5", with: "memory: 2.5")
@@ -45,6 +46,20 @@ final class ResourceSettingsTests: XCTestCase {
       XCTAssertEqual(try String(contentsOf: backup, encoding: .utf8), original)
       try ResourceSettings(cpus: 1, memoryGiB: 1.5).save(to: config)
       XCTAssertEqual(try String(contentsOf: backup, encoding: .utf8), original)
+    }
+  }
+  func testDiskGrowsButNeverShrinks() throws {
+    try withConfig { config in
+      try ResourceSettings(cpus: 2, memoryGiB: 4.5, diskGiB: 160).save(to: config)
+      XCTAssertEqual(try ResourceSettings.read(from: config).diskGiB, 160)
+      let grown = try String(contentsOf: config, encoding: .utf8)
+      XCTAssertEqual(grown, original.replacingOccurrences(of: "disk: 100", with: "disk: 160"))
+      XCTAssertThrowsError(
+        try ResourceSettings(cpus: 2, memoryGiB: 4.5, diskGiB: 120).save(to: config))
+      XCTAssertEqual(try String(contentsOf: config, encoding: .utf8), grown)
+      // Leaving the disk out keeps the configured size.
+      try ResourceSettings(cpus: 1, memoryGiB: 4.5).save(to: config)
+      XCTAssertEqual(try ResourceSettings.read(from: config).diskGiB, 160)
     }
   }
   func testOutOfRangeAndNonfiniteAllocationsLeaveFileUntouched() throws {
