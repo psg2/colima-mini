@@ -95,8 +95,8 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
 - Open a container page for Overview, Logs, Ports and Mounts. Use Back to return
   to the originating list and its filters.
 - Follow logs live: the last 500 lines, then new output as it arrives, keeping up
-  to 5,000 lines. Pause, scroll with the latest output, search and copy the
-  displayed text.
+  to 5,000 lines. Pause, scroll with the latest output, wrap long lines, search
+  and copy the displayed text. Logs open at the start of each line.
 - Follow a whole project with **Logs** on its page, **Show logs** in its menu or
   Command+K. Each line names its service, and **Services** hides the ones you
   don't need.
