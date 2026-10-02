@@ -29,10 +29,12 @@ struct ConditionPill: View {
 }
 
 // TCP doesn't identify HTTP, so the chip copies the address and opening a
-// browser stays an explicit protocol choice.
+// browser stays an explicit protocol choice, except for images known to serve
+// a web page on that port, where a click opens it.
 struct PortChip: View {
   let port: PublishedPort
   var compact = false
+  var web = false
   var body: some View {
     Menu {
       Button("Copy \(port.address)") { Launcher.copy(port.address) }
@@ -42,15 +44,23 @@ struct PortChip: View {
         Button("Open as HTTPS") { port.url(scheme: "https").map { NSWorkspace.shared.open($0) } }
       }
     } label: {
-      Text(compact ? ":\(port.hostPort)" : port.label).font(.system(.caption2, design: .monospaced))
+      HStack(spacing: 2) {
+        Text(compact ? ":\(port.hostPort)" : port.label)
+        if web { Image(systemName: "arrow.up.right") }
+      }.font(.system(.caption2, design: .monospaced))
     } primaryAction: {
-      Launcher.copy(port.address)
+      if web, let url = port.url(scheme: "http") {
+        NSWorkspace.shared.open(url)
+      } else {
+        Launcher.copy(port.address)
+      }
     }
     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
     .padding(.horizontal, 6).padding(.vertical, 2)
     .background(Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 4))
     .help(
-      "Click to copy \(port.address). Host \(port.hostPort) → container \(port.containerPort)/\(port.protocolName)"
+      (web ? "Click to open http://\(port.address)" : "Click to copy \(port.address)")
+        + ". Host \(port.hostPort) → container \(port.containerPort)/\(port.protocolName)"
     )
     .accessibilityLabel("Port \(port.label)")
   }
@@ -60,9 +70,12 @@ struct PortChips: View {
   let ports: [PublishedPort]
   var limit = 3
   var compact = false
+  var profile: ImageProfile? = nil
   var body: some View {
     HStack(spacing: 4) {
-      ForEach(ports.prefix(limit)) { PortChip(port: $0, compact: compact) }
+      ForEach(ports.prefix(limit)) {
+        PortChip(port: $0, compact: compact, web: profile?.opensInBrowser($0) == true)
+      }
       if ports.count > limit {
         Text("+\(ports.count - limit)").font(.caption2).foregroundStyle(.secondary)
           .help(ports.dropFirst(limit).map(\.label).joined(separator: ", "))
@@ -175,5 +188,30 @@ struct OpenFolderButton: View {
       origin.exists()
         ? "Open \(origin.displayPath)" + (preferred.map { " in \($0.name)" } ?? "")
         : "Folder deleted: \(origin.displayPath)")
+  }
+}
+
+// SF Symbols per image category, so rows are recognizable without fetching logos.
+struct ImageIcon: View {
+  let profile: ImageProfile
+  private var style: (String, Color) {
+    switch profile.category {
+    case .database: return ("cylinder.split.1x2", .blue)
+    case .cache: return ("bolt.horizontal", .red)
+    case .search: return ("magnifyingglass", .yellow)
+    case .queue: return ("tray.2", .orange)
+    case .storage: return ("archivebox", .teal)
+    case .cloud: return ("cloud", .cyan)
+    case .webServer: return ("globe", .green)
+    case .webTool: return ("macwindow", .purple)
+    case .runtime: return ("chevron.left.forwardslash.chevron.right", .indigo)
+    case .other: return ("shippingbox", .secondary)
+    }
+  }
+  var body: some View {
+    let (symbol, color) = style
+    Image(systemName: symbol).font(.system(size: 11, weight: .medium)).foregroundStyle(color)
+      .frame(width: 22, height: 22)
+      .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 5))
   }
 }

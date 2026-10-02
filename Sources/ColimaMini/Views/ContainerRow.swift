@@ -19,18 +19,21 @@ struct ContainerRow: View {
         } label: {
           Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
             .foregroundStyle(isChecked ? Color.accentColor : Color.secondary)
-            .frame(width: 18)
+            .frame(width: 22)
         }.buttonStyle(.plain).help(isChecked ? "Deselect" : "Select for a bulk action (⌘-click)")
           .accessibilityLabel(isChecked ? "Deselect \(container.name)" : "Select \(container.name)")
+      } else if container.needsAttention {
+        Image(systemName: "exclamationmark.triangle").foregroundStyle(Color.orange)
+          .frame(width: 22)
       } else {
-        Image(systemName: container.needsAttention ? "exclamationmark.triangle" : "shippingbox")
-          .foregroundStyle(container.needsAttention ? Color.orange : Color.secondary)
-          .frame(width: 18)
+        ImageIcon(profile: container.imageProfile).frame(width: 22)
       }
       VStack(alignment: .leading, spacing: 4) {
         HStack(spacing: 8) {
           Text(container.service).fontWeight(.medium).lineLimit(1)
-          if !container.publishedPorts.isEmpty { PortChips(ports: container.publishedPorts) }
+          if !container.publishedPorts.isEmpty {
+            PortChips(ports: container.publishedPorts, profile: container.imageProfile)
+          }
         }
         Text(
           showProject

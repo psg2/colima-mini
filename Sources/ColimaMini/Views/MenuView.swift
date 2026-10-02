@@ -217,7 +217,9 @@ struct MenuView: View {
             Button(container.service) { show(container) }.buttonStyle(.plain).lineLimit(1)
               .help(container.name + " · " + container.status)
             Spacer()
-            PortChips(ports: container.publishedPorts, limit: 2, compact: true)
+            PortChips(
+              ports: container.publishedPorts, limit: 2, compact: true,
+              profile: container.imageProfile)
             if container.running {
               Button {
                 Launcher.shell(container, model: model)

@@ -109,7 +109,9 @@ struct ContainerDetailView: View {
       HStack(spacing: 16) {
         ConditionPill(condition: c.condition)
         Text(c.uptime).foregroundStyle(.secondary)
-        if !c.publishedPorts.isEmpty { PortChips(ports: c.publishedPorts, limit: 6) }
+        if !c.publishedPorts.isEmpty {
+          PortChips(ports: c.publishedPorts, limit: 6, profile: c.imageProfile)
+        }
         if let metric = model.snapshot?.metric(for: c) {
           Text("CPU " + metric.cpuPercent).monospacedDigit()
           Text("Memory " + memoryText(metric.memoryBytes)).monospacedDigit()
