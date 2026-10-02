@@ -107,7 +107,10 @@ The **Go** and **Container** menus list every shortcut.
   offered, and removal keeps volumes. The container page also shows network and
   disk I/O and process count.
 - Rows show health, uptime and published ports. Click a port to copy
-  `localhost:PORT`; its menu opens HTTP or HTTPS explicitly. Hover a row for Logs,
+  `localhost:PORT`; its menu opens HTTP or HTTPS explicitly. For images known to
+  serve a web page on that port, such as pgweb, Adminer, Grafana, nginx or the
+  RabbitMQ management UI, the chip shows ↗ and a click opens it in the browser.
+  Rows show an icon for the image's kind: database, cache, queue, web tool… Hover a row for Logs,
   Shell and Restart, or right-click for every action.
 - Select several containers with the circle that appears on hover, or ⌘-click a
   row. While some are selected, clicking a row toggles it, and the bar above the
