@@ -72,7 +72,7 @@ private actor ResultGate<Value> {
     XCTAssertEqual(model.logs, "current container log")
     XCTAssertFalse(model.logsLoading)
   }
-  func testBackRestoresProjectSearchCollapseAndScrollContext() throws {
+  func testBackRestoresProjectSearchCollapseAndScrollContext() async throws {
     let model = Dashboard(backend: backend())
     model.navigate(.containers, project: "demo")
     model.search = "postgres"
@@ -89,7 +89,7 @@ private actor ResultGate<Value> {
     XCTAssertEqual(model.collapsed, ["other"])
     XCTAssertEqual(model.listScrollID, "demo")
   }
-  func testGroupControlHandlesMixedGroupsAndSearchWithoutErasingPreferences() throws {
+  func testGroupControlHandlesMixedGroupsAndSearchWithoutErasingPreferences() async throws {
     let state = try snapshot()
     let fixture = try JSONDecoder().decode(
       Fixture.self, from: Data(#"{"vm":"","containers":"","stats":""}"#.utf8))
@@ -154,7 +154,7 @@ private actor ResultGate<Value> {
         {"id":"\(id)","name":"container-\(id)","image":"postgres:18","imageID":"sha256:test","state":{"exitCode":\(exitCode)},"ports":[],"mounts":[]}
         """.utf8))
   }
-  func testBackToEarlierContainerClearsOtherDetailsAndPausedLogs() throws {
+  func testBackToEarlierContainerClearsOtherDetailsAndPausedLogs() async throws {
     let model = Dashboard(backend: backend())
     model.openContainer("abc123")
     model.openVolume("demo_db")

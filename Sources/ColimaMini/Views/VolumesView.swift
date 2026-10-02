@@ -52,30 +52,7 @@ struct VolumesView: View {
         ScrollView {
           LazyVStack(spacing: 1) {
             ForEach(visible) { volume in
-              Button {
-                model.openVolume(volume.name)
-              } label: {
-                HStack(spacing: 12) {
-                  Image(systemName: "externaldrive").foregroundStyle(.secondary)
-                  VStack(alignment: .leading, spacing: 5) {
-                    Text(volume.name).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
-                    Text(
-                      (volume.project.map { $0 + " · " } ?? "") + volume.driver
-                        + " · "
-                        + (volume.referencesAvailable
-                          ? "\(volume.references.count) container references"
-                          : "Reference data unavailable")
-                    )
-                    .font(.caption).foregroundStyle(.secondary)
-                  }
-                  Spacer()
-                  Text(volume.attached.map { $0 ? "Attached" : "Unattached" } ?? "Use unknown")
-                    .font(.caption).foregroundStyle(.secondary)
-                  Text(bytesText(volume.sizeBytes)).monospacedDigit().frame(
-                    width: 95, alignment: .trailing)
-                  Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
-                }.padding(12).contentShape(Rectangle())
-              }.buttonStyle(.plain).accessibilityIdentifier("volume.row." + volume.name)
+              VolumeRow(volume: volume) { model.openVolume(volume.name) }
               Divider()
             }
           }
@@ -184,5 +161,40 @@ struct VolumeDetailView: View {
       }
       Spacer(minLength: 0)
     }.padding(24).task { await model.loadVolumes() }
+  }
+}
+
+private struct VolumeRow: View {
+  let volume: Volume
+  let open: () -> Void
+  private var subtitle: String {
+    var pieces = [volume.driver]
+    if let project = volume.project { pieces.insert(project, at: 0) }
+    pieces.append(
+      volume.referencesAvailable
+        ? countText(volume.references.count, "container reference") : "Reference data unavailable")
+    return pieces.joined(separator: " · ")
+  }
+  private var useDescription: String {
+    switch volume.attached {
+    case true: return "Attached"
+    case false: return "Unattached"
+    case nil: return "Use unknown"
+    }
+  }
+  var body: some View {
+    Button(action: open) {
+      HStack(spacing: 12) {
+        Image(systemName: "externaldrive").foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 5) {
+          Text(volume.name).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
+          Text(subtitle).font(.caption).foregroundStyle(.secondary)
+        }
+        Spacer()
+        Text(useDescription).font(.caption).foregroundStyle(.secondary)
+        Text(bytesText(volume.sizeBytes)).monospacedDigit().frame(width: 95, alignment: .trailing)
+        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+      }.padding(12).contentShape(Rectangle())
+    }.buttonStyle(.plain).accessibilityIdentifier("volume.row." + volume.name)
   }
 }
