@@ -24,3 +24,14 @@ package struct Volume: Codable, Identifiable {
   package var id: String { name }
   package var attached: Bool? { referencesAvailable ? !references.isEmpty : nil }
 }
+
+extension Backend {
+  // Deletes the volume and its data. Without --force, Docker refuses a volume
+  // that any container, running or stopped, still references.
+  package func removeVolume(_ name: String) async throws {
+    guard !name.isEmpty, !name.hasPrefix("-") else {
+      throw AppError.message("The volume name is invalid.")
+    }
+    _ = try await docker(["volume", "rm", name], timeout: 60)
+  }
+}

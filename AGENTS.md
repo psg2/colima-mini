@@ -4,7 +4,9 @@
 - Preserve the default Colima profile and explicit Docker context selection.
 - Sample mode must never run runtime or container mutations.
 - Cleanup removes only items listed in a preview, after confirmation, one ID
-  at a time and never with force. Never remove named volumes.
+  at a time and never with force. Cleanup never removes named volumes; a named
+  volume is deleted only by an explicit, confirmed action on that volume or its
+  Compose project (Down and delete volumes).
 - Write code, comments, documentation and PRs in English.
 - Open pull requests ready for review and explain the problem, changes,
   validation and limitations. Monitor checks and bot review comments.

@@ -56,7 +56,13 @@ package struct PendingAction: Identifiable {
   @Published package var volumeSearch = ""
   @Published package var imageSearch = ""
   @Published package var unattachedOnly = false
-  @Published package var volumeKind = VolumeKind.all
+  // Anonymous volumes usually outnumber named ones, so the list starts with
+  // named volumes and remembers the choice.
+  @Published package var volumeKind =
+    VolumeKind(rawValue: UserDefaults.standard.string(forKey: "volumeKind") ?? "") ?? .named
+  {
+    didSet { UserDefaults.standard.set(volumeKind.rawValue, forKey: "volumeKind") }
+  }
   @Published package var volumeSortBySize = false
   @Published package var logs = ""
   @Published package var logError: String?
@@ -443,6 +449,20 @@ package struct PendingAction: Identifiable {
     } catch { networksError = "Could not remove \(network.name): " + error.localizedDescription }
     busy = false
     await loadNetworks()
+  }
+  // Returns whether Docker removed it; the volume list is measured again.
+  @discardableResult package func removeVolume(_ name: String) async -> Bool {
+    guard !busy, !sample else { return false }
+    busy = true
+    var removed = false
+    do {
+      try await backend.removeVolume(name)
+      volumesError = nil
+      removed = true
+    } catch { volumesError = "Could not remove \(name): " + error.localizedDescription }
+    busy = false
+    await loadVolumes()
+    return removed
   }
   package func loadVolumes() async {
     guard !volumesLoading else { return }
