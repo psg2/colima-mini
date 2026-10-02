@@ -13,10 +13,6 @@ struct StorageView: View {
               .font(.caption).foregroundStyle(.secondary)
           }
           Spacer()
-          Button("Reclaim space…") { model.openReclaim() }
-            .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
-            .help("Preview unused Docker objects and remove the ones you choose")
-            .accessibilityIdentifier("storage.reclaim")
           RefreshButton(busy: model.storageLoading) { await model.loadStorage() }
         }
         if let error = model.storageError { StatusMessage(text: error) }
@@ -31,6 +27,8 @@ struct StorageView: View {
                   + (storage.configuredCapacityBytes.map { bytesText(Double($0)) } ?? "Unavailable")
               )
               .foregroundStyle(.secondary)
+              Button("Change…") { model.navigate(.settings) }.controlSize(.small)
+                .help("Grow the disk in Settings")
             }
             if let filesystem = storage.filesystem {
               Text(bytesText(Double(filesystem.usedBytes)) + " used").font(
@@ -103,6 +101,7 @@ struct StorageView: View {
           Spacer()
           Button("Reclaim space…") { model.openReclaim() }
             .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
+            .accessibilityIdentifier("storage.reclaim")
         }
         Divider()
         HStack {
