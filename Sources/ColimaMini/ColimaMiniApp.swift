@@ -66,7 +66,10 @@ import SwiftUI
     Window(sample ? "Colima Mini · Sample data" : "Colima Mini", id: "dashboard") {
       DashboardView(model: model).frame(minWidth: 920, minHeight: 580)
     }.defaultSize(width: 1120, height: 740)
-      .commands { CommandGroup(replacing: .newItem) {} }
+      .commands {
+        CommandGroup(replacing: .newItem) {}
+        AppCommands(model: model)
+      }
     Settings { SettingsView(model: model) }
     MenuBarExtra {
       MenuView(model: model)

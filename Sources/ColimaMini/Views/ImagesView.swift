@@ -23,7 +23,8 @@ struct ImagesView: View {
           .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
         RefreshButton(busy: model.imagesLoading) { await model.loadImages() }
       }
-      TextField("Filter images", text: $model.imageSearch).textFieldStyle(.roundedBorder)
+      TextField("Filter images", text: $model.imageSearch).findable(model).textFieldStyle(
+        .roundedBorder)
       if let error = model.imagesError { StatusMessage(text: error) }
       if model.imagesLoading { ProgressView().controlSize(.small) }
       ScrollView {

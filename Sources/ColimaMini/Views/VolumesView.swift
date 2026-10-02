@@ -31,8 +31,9 @@ struct VolumesView: View {
         RefreshButton(busy: model.volumesLoading) { await model.loadVolumes() }
       }
       HStack {
-        TextField("Filter volumes or projects", text: $model.volumeSearch).textFieldStyle(
-          .roundedBorder)
+        TextField("Filter volumes or projects", text: $model.volumeSearch).findable(model)
+          .textFieldStyle(
+            .roundedBorder)
         Picker("Kind", selection: $model.volumeKind) {
           ForEach(VolumeKind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
         }.pickerStyle(.segmented).labelsHidden().fixedSize()

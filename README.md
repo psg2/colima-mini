@@ -72,6 +72,24 @@ search loaded objects and pages. Type an action such as `restart`, `shell` or `l
 to act on a container. Use the arrow keys to choose a result and Return to open it.
 Settings stays aligned at the bottom and is also available with **Command+,**.
 
+### Keyboard shortcuts
+
+The **Go** and **Container** menus list every shortcut.
+
+| Keys | Action |
+| --- | --- |
+| ⌘1 … ⌘5 | Overview, Containers, Volumes, Images, Storage |
+| ⌘K | Search and actions |
+| ⌘F | Focus the filter or log search on the current page |
+| ⌘[ | Back |
+| ⌘R | Refresh |
+| ⌘, | Settings |
+| ⌥⌘1 … ⌥⌘5 | Container tabs: Overview, Logs, Ports, Mounts, Env |
+| ⇧⌘T | Open a shell in the container |
+| ⇧⌘O | Open the project folder in the default app |
+| ⇧⌘S / ⇧⌘R | Stop or start / restart the container (asks first) |
+| ⌘⌫ | Remove the stopped container (asks first) |
+
 - Expand or collapse each Compose project, use the direct **Collapse all** or
   **Expand all** action, or switch to a flat container list. Searching reveals
   matching services without discarding your saved collapsed groups.
