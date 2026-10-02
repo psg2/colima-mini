@@ -92,8 +92,12 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
 - **Shell** opens `docker exec -it` in your terminal app, preferring bash.
 - Filter by project, search names or images, and show only running containers.
 - Start, stop and restart containers or displayed project groups, with confirmation.
-- Open a container page for Overview, Logs, Ports and Mounts. Use Back to return
+- Open a container page for Overview, Logs, Ports, Mounts and Env. Use Back to return
   to the originating list and its filters.
+- **Env** lists the container's environment variables. Names that usually hold
+  credentials (password, secret, token, key, DSN…) and URLs with a password are
+  masked until you reveal them one at a time, and a masked value can't be
+  copied. Values are read only while the tab is open.
 - Follow logs live: the last 500 lines, then new output as it arrives, keeping up
   to 5,000 lines. Pause, scroll with the latest output, wrap long lines, search
   and copy the displayed text. Logs open at the start of each line.

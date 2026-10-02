@@ -11,6 +11,9 @@
     {"verdict": "stale", "name": "worker", "project": null, "reason": "not running for 2d", "containers": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]},
     {"verdict": "recent", "name": "demo", "project": "demo", "reason": "no clients, no traffic, last log 5m ago", "containers": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]}
   ],
+  "environment": {
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": ["POSTGRES_USER=demo", "POSTGRES_PASSWORD=sample-password", "POSTGRES_DB=demo", "DATABASE_URL=postgres://demo:sample-password@localhost:5432/demo", "PGDATA=/var/lib/postgresql/data", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG=en_US.utf8"]
+  },
   "details": {
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
       "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

@@ -25,7 +25,7 @@ struct ContainerDetailView: View {
         header(container)
         Picker("Container details", selection: $model.containerTab) {
           ForEach(ContainerPageTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-        }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 410).padding(.vertical, 18)
+        }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 480).padding(.vertical, 18)
           .accessibilityIdentifier("container.tabs")
         if let error = model.detailsError { StatusMessage(text: error).padding(.bottom, 12) }
         if model.detailsLoading { ProgressView().controlSize(.small) }
@@ -34,6 +34,7 @@ struct ContainerDetailView: View {
         case .logs: logsView
         case .ports: portsView
         case .mounts: mountsView
+        case .environment: EnvironmentPanel(model: model, containerID: container.id)
         }
       } else if model.snapshot == nil {
         ProgressView("Loading container…").frame(maxWidth: .infinity, maxHeight: .infinity)

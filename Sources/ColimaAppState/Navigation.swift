@@ -38,6 +38,7 @@ package enum ContainerPageTab: String, CaseIterable {
   case logs = "Logs"
   case ports = "Ports"
   case mounts = "Mounts"
+  case environment = "Env"
 }
 
 package enum VolumeKind: String, CaseIterable {
