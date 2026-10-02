@@ -19,6 +19,8 @@ package struct Volume: Codable, Identifiable {
   package let references: [VolumeReference]
   package let referencesAvailable: Bool
   package let dataIssue: String?
+  // Docker labels volumes it creates for unnamed mounts; nil when metadata is unavailable.
+  package var anonymous: Bool? = nil
   package var id: String { name }
   package var attached: Bool? { referencesAvailable ? !references.isEmpty : nil }
 }

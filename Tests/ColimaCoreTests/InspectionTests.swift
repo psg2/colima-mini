@@ -94,6 +94,21 @@ final class InspectionTests: XCTestCase {
     }
   }
 
+  func testAnonymousVolumesAreIdentifiedByDockerLabel() async throws {
+    let anonymous = String(repeating: "c", count: 64)
+    try await InspectionRuntime.run(overrides: [
+      "volumeList":
+        "{\"Name\":\"demo_db\",\"Driver\":\"local\"}\n{\"Name\":\"\(anonymous)\",\"Driver\":\"local\"}",
+      "volumeMetadata":
+        "{\"Name\":\"demo_db\",\"Driver\":\"local\",\"Labels\":{\"com.docker.compose.project\":\"demo\"}}\n{\"Name\":\"\(anonymous)\",\"Driver\":\"local\",\"Labels\":{\"com.docker.volume.anonymous\":\"\"}}",
+    ]) { backend in
+      let volumes = try await backend.volumes()
+      XCTAssertEqual(volumes.first { $0.name == anonymous }?.anonymous, true)
+      XCTAssertEqual(volumes.first { $0.name == "demo_db" }?.anonymous, false)
+      XCTAssertEqual(volumes.first { $0.name == "demo_db" }?.project, "demo")
+    }
+  }
+
   func testFailedReferenceReadNeverReportsVolumesAsUnattached() async throws {
     try await InspectionRuntime.run(overrides: ["inspectError": true]) { backend in
       let volumes = try await backend.volumes()

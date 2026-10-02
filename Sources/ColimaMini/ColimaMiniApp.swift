@@ -24,7 +24,9 @@ import SwiftUI
       }
       let fixture = try Self.fixtureArgument()
       sample = fixture != nil
-      _model = StateObject(wrappedValue: Dashboard(backend: Backend(fixture: fixture)))
+      let dashboard = Dashboard(backend: Backend(fixture: fixture))
+      dashboard.restoreLastSection()
+      _model = StateObject(wrappedValue: dashboard)
       if CommandLine.arguments.contains("--check") || CommandLine.arguments.contains("--scan") {
         Task {
           do {
@@ -58,7 +60,7 @@ import SwiftUI
     MenuBarExtra {
       MenuView(model: model)
     } label: {
-      Image(nsImage: llamaMenuIcon).accessibilityLabel("Colima Mini")
+      MenuBarLabel(model: model)
     }.menuBarExtraStyle(.window)
   }
   static func fixtureArgument() throws -> Fixture? {
@@ -69,5 +71,30 @@ import SwiftUI
     }
     return try JSONDecoder().decode(
       Fixture.self, from: Data(contentsOf: URL(fileURLWithPath: args[index + 1])))
+  }
+}
+
+// The label lives for the whole app session, so it owns the refresh loop and
+// the window opener used by notifications.
+struct MenuBarLabel: View {
+  @ObservedObject var model: Dashboard
+  @Environment(\.openWindow) private var openWindow
+  var body: some View {
+    let attention = model.attention.count
+    HStack(spacing: 3) {
+      Image(nsImage: model.snapshot?.vm.running == false ? llamaMenuIconDimmed : llamaMenuIcon)
+      if attention > 0 { Text("\(attention)").monospacedDigit() }
+    }
+    .accessibilityLabel(
+      attention > 0 ? "Colima Mini, \(attention) containers need attention" : "Colima Mini"
+    )
+    .task {
+      Notifier.shared.attach(to: model) { id in
+        model.openContainer(id, tab: .logs)
+        openWindow(id: "dashboard")
+        NSApp.activate(ignoringOtherApps: true)
+      }
+      await model.poll { NSApp.isActive }
+    }
   }
 }

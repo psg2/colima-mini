@@ -9,6 +9,7 @@ struct ProjectSection: View {
   @ObservedObject var model: Dashboard
   let project: String
   let containers: [Container]
+  var origin: ProjectOrigin? { containers.lazy.compactMap(\.origin).first }
   var expanded: Binding<Bool> {
     Binding(
       get: { !model.search.isEmpty || !model.collapsed.contains(project) },
@@ -28,9 +29,23 @@ struct ProjectSection: View {
         Image(systemName: project == "Standalone" ? "shippingbox" : "square.stack.3d.up.fill")
           .foregroundStyle(.secondary)
         VStack(alignment: .leading, spacing: 3) {
-          Text(project).font(.headline).lineLimit(1).truncationMode(.middle)
-          Text("\(containers.filter(\.running).count) of \(containers.count) running")
-            .font(.caption).foregroundStyle(.secondary)
+          HStack(spacing: 6) {
+            Text(project).font(.headline).lineLimit(1).truncationMode(.middle)
+            if let origin, !origin.exists() {
+              Text("Folder missing").font(.caption2.weight(.medium)).foregroundStyle(.orange)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Color.orange.opacity(0.13), in: Capsule())
+                .help("\(origin.displayPath) no longer exists. The worktree may have been removed.")
+            }
+          }
+          HStack(spacing: 4) {
+            Text("\(containers.filter(\.running).count) of \(containers.count) running")
+            if let origin {
+              Text("·")
+              Label(origin.summary, systemImage: origin.kind.symbol).lineLimit(1)
+                .truncationMode(.middle)
+            }
+          }.font(.caption).foregroundStyle(.secondary).help(origin?.displayPath ?? "")
         }
         if containers.contains(where: \.needsAttention) {
           Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).help(

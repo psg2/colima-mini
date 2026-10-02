@@ -29,6 +29,9 @@ package struct PendingAction: Identifiable {
   private var logGeneration = 0
   private var detailsGeneration = 0
   private var backRoutes: [AppRoute] = []
+  // Containers changed by this app recently; their transitions are not alerts.
+  private var actedOn: [String: Date] = [:]
+  package var onAlerts: (([ContainerAlert]) -> Void)?
   @Published package var route = AppRoute.containers
   @Published package var snapshot: Snapshot?
   @Published package var error: String?
@@ -36,12 +39,14 @@ package struct PendingAction: Identifiable {
   @Published package var busy = false
   @Published package var lastRefresh: Date?
   @Published package var selectedID: String?
+  @Published package var containerTab = ContainerPageTab.overview
   @Published package var project = "All containers"
   @Published package var search = ""
   @Published package var listScrollID: String?
   @Published package var volumeSearch = ""
   @Published package var imageSearch = ""
   @Published package var unattachedOnly = false
+  @Published package var volumeKind = VolumeKind.all
   @Published package var volumeSortBySize = false
   @Published package var logs = ""
   @Published package var logError: String?
@@ -74,6 +79,8 @@ package struct PendingAction: Identifiable {
   @Published package var storageError: String?
   @Published package var storageLoading = false
   @Published package var history: [String: [MetricSample]] = [:]
+  @Published package var totalHistory: [MetricSample] = []
+  @Published package var notificationsEnabled = true
 
   package init(
     backend: Backend,
@@ -94,6 +101,8 @@ package struct PendingAction: Identifiable {
       collapsed = Set(defaults.stringArray(forKey: "collapsedProjects") ?? [])
       let interval = defaults.integer(forKey: "refreshInterval")
       refreshInterval = [5, 10, 30, 60].contains(interval) ? interval : 5
+      notificationsEnabled =
+        defaults.object(forKey: "notifications") == nil || defaults.bool(forKey: "notifications")
     }
   }
   package func savePreferences() {
@@ -103,6 +112,12 @@ package struct PendingAction: Identifiable {
     defaults.set(grouped, forKey: "grouped")
     defaults.set(Array(collapsed), forKey: "collapsedProjects")
     defaults.set(refreshInterval, forKey: "refreshInterval")
+    defaults.set(notificationsEnabled, forKey: "notifications")
+  }
+  package func restoreLastSection() {
+    guard !sample, let name = UserDefaults.standard.string(forKey: "lastSection") else { return }
+    let sections: [AppRoute] = [.overview, .containers, .volumes, .images, .storage]
+    if let section = sections.first(where: { $0.sectionName == name }) { route = section }
   }
   package var sample: Bool { backend.fixture != nil }
   package var containers: [Container] { snapshot?.containers ?? [] }
@@ -142,10 +157,18 @@ package struct PendingAction: Identifiable {
     route = target
     backRoutes.removeAll()
     selectedID = nil
+    if !sample, let name = target.sectionName {
+      UserDefaults.standard.set(name, forKey: "lastSection")
+    }
   }
-  package func openContainer(_ id: String) {
-    backRoutes.append(route)
+  package var attention: [Container] { containers.filter(\.needsAttention) }
+  package func origin(of project: String) -> ProjectOrigin? {
+    containers.first { $0.project == project && $0.origin != nil }?.origin
+  }
+  package func openContainer(_ id: String, tab: ContainerPageTab = .overview) {
+    if route != .container(id) { backRoutes.append(route) }
     route = .container(id)
+    containerTab = tab
     selectedID = id
     detailsGeneration += 1
     detailsLoading = false
@@ -168,6 +191,7 @@ package struct PendingAction: Identifiable {
     route = backRoutes.popLast() ?? .containers
     if case .container(let id) = route {
       selectedID = id
+      containerTab = .overview
       detailsGeneration += 1
       details = nil
       detailsDate = nil
@@ -194,6 +218,15 @@ package struct PendingAction: Identifiable {
     refreshTask = nil
     refreshing = false
   }
+  // One loop serves the window and the menu bar. It slows down while another
+  // app is in front, so background alerts keep working at a lower cost.
+  package func poll(isForeground: @escaping () -> Bool) async {
+    while !Task.isCancelled {
+      await refresh()
+      let seconds = isForeground() ? refreshInterval : max(30, refreshInterval)
+      do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
+    }
+  }
   package func refresh() async {
     guard !refreshing, !busy else { return }
     refreshGeneration += 1
@@ -210,7 +243,9 @@ package struct PendingAction: Identifiable {
     do {
       let updated = try await task.value
       guard generation == refreshGeneration, !Task.isCancelled, !busy else { return }
+      let previous = snapshot
       snapshot = updated
+      publishAlerts(from: previous, to: updated)
       error = nil
       let date = Date()
       lastRefresh = date
@@ -222,6 +257,17 @@ package struct PendingAction: Identifiable {
         }
       }
       history = history.filter { key, _ in updated.containers.contains { $0.id == key } }
+      if updated.vm.running {
+        totalHistory = Array(
+          (totalHistory
+            + [
+              // Relative to VM capacity, unlike per-container samples.
+              MetricSample(
+                date: date,
+                cpu: updated.totalCPU(updated.containers) / Double(max(1, updated.vm.cpus)),
+                memory: updated.totalMemory(updated.containers))
+            ]).suffix(60))
+      }
       if project != "All containers" && !updated.projects.contains(project) {
         project = "All containers"
       }
@@ -230,6 +276,15 @@ package struct PendingAction: Identifiable {
         self.error = error.localizedDescription
       }
     }
+  }
+  private func publishAlerts(from previous: Snapshot?, to updated: Snapshot) {
+    let now = Date()
+    actedOn = actedOn.filter { now.timeIntervalSince($0.value) < 120 }
+    guard notificationsEnabled, !sample, let previous, previous.vm.running, updated.vm.running
+    else { return }
+    let alerts = ContainerAlert.changes(from: previous.containers, to: updated.containers)
+      .filter { actedOn[$0.containerID] == nil }
+    if !alerts.isEmpty { onAlerts?(alerts) }
   }
   package func loadLogs(_ id: String) async {
     guard route == .container(id), !logsPaused else { return }
@@ -324,6 +379,8 @@ package struct PendingAction: Identifiable {
     busy = true
     error = nil
     pending = nil
+    let now = Date()
+    for container in action.vm ? containers : action.containers { actedOn[container.id] = now }
     var actionError: String?
     do {
       if action.vm {
@@ -343,6 +400,8 @@ package struct PendingAction: Identifiable {
     busy = true
     applyingResources = true
     settingsMessage = nil
+    let now = Date()
+    for container in containers { actedOn[container.id] = now }
     defer {
       applyingResources = false
       busy = false

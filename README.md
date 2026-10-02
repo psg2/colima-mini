@@ -66,16 +66,25 @@ Confirm that the dashboard opens and reports the default Colima profile.
 
 ## Use
 
-Use the sidebar to open Containers, a Compose project, Volumes, Images, Storage
-or Settings. Press **Command+K** to search loaded objects and pages. Use the arrow
-keys to choose a result and Return to open it.
+Use the sidebar to open Overview, Containers, a Compose project, Volumes, Images,
+Storage or Settings. The app reopens the last page you used. Press **Command+K** to
+search loaded objects and pages. Type an action such as `restart`, `shell` or `logs`
+to act on a container. Use the arrow keys to choose a result and Return to open it.
 Settings stays aligned at the bottom and is also available with **Command+,**.
 
 - Expand or collapse each Compose project, use the direct **Collapse all** or
   **Expand all** action, or switch to a flat container list. Searching reveals
   matching services without discarding your saved collapsed groups.
-- See project resource totals, VM allocation and container usage. Overview CPU is
-  relative to allocated VM capacity; row CPU follows Docker's 100% per core convention.
+- Overview shows the VM, counts, reclaimable estimates, containers that need
+  attention, resource meters and recent CPU. Overview CPU is relative to allocated
+  VM capacity; row CPU follows Docker's 100% per core convention.
+- Each project shows where Compose ran it. Claude, Codex, Conductor and Orca
+  worktrees are labeled, and a project whose folder was removed shows
+  **Folder missing**. Open the folder in Finder, Terminal or a detected editor.
+- Rows show health, uptime and published ports. Click a port to copy
+  `localhost:PORT`; its menu opens HTTP or HTTPS explicitly. Hover a row for Logs,
+  Shell and Restart, or right-click for every action.
+- **Shell** opens `docker exec -it` in your terminal app, preferring bash.
 - Filter by project, search names or images, and show only running containers.
 - Start, stop and restart containers or displayed project groups, with confirmation.
 - Open a container page for Overview, Logs, Ports and Mounts. Use Back to return
@@ -84,7 +93,7 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
   and copy the displayed text. Refresh is bounded polling, not an unlimited stream.
 - Inspect published port bindings and copy their addresses. TCP doesn't identify
   an HTTP service, so database ports don't get an inferred browser URL.
-- Inspect named volumes and their container mount destinations. References include
+- Inspect named and anonymous volumes and their container mount destinations. References include
   stopped containers; an unattached volume isn't automatically safe to delete.
 - Open Storage for disk measurements and **Review unused containers**. The cleanup
   scanner produces a report; the app never applies cleanup.
@@ -138,8 +147,15 @@ Settings modify only root `cpu` and `memory` fields in the local profile, preser
 other settings, comments and permissions. The first original file is retained as
 `colima.yaml.mini-backup` beside the profile.
 
-The menu bar shows a monochrome llama matching the app icon. Closing the dashboard
-keeps the menu bar available. Quitting Colima Mini leaves Colima running.
+The menu bar shows a monochrome llama matching the app icon. It dims while Colima
+is stopped and shows a count when containers need attention. Its panel lists those
+containers first, then expandable projects with ports, shells and actions.
+When a container exits unexpectedly, starts failing its health check or enters a
+restart loop, the app sends a notification; clicking it opens the logs. Changes
+made from Colima Mini don't notify, and exit code 143 (a normal `docker stop`)
+is ignored. Turn this off or open the app at login in Settings. Refresh slows to
+at most every 30 seconds while another app is in front.
+Closing the dashboard keeps the menu bar available. Quitting Colima Mini leaves Colima running.
 Docker operations explicitly select the `colima` context; a foreign terminal
 `DOCKER_HOST` or `DOCKER_CONTEXT` does not redirect the app.
 

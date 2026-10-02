@@ -4,16 +4,9 @@ import ColimaAppState
 import ColimaCore
 import SwiftUI
 
-private enum ContainerTab: String, CaseIterable {
-  case overview = "Overview"
-  case logs = "Logs"
-  case ports = "Ports"
-  case mounts = "Mounts"
-}
 struct ContainerDetailView: View {
   @ObservedObject var model: Dashboard
   let id: String
-  @State private var tab = ContainerTab.overview
   @State private var logSearch = ""
   @State private var follow = true
   @State private var timestamps = true
@@ -29,6 +22,7 @@ struct ContainerDetailView: View {
       return String(line[line.index(after: space)...])
     }.joined(separator: "\n")
   }
+  var tab: ContainerPageTab { model.containerTab }
   var polling: Bool { tab == .logs && !model.logsPaused && scenePhase == .active }
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -41,8 +35,8 @@ struct ContainerDetailView: View {
       .keyboardShortcut("[", modifiers: .command).accessibilityIdentifier("container.back")
       if let container {
         header(container)
-        Picker("Container details", selection: $tab) {
-          ForEach(ContainerTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+        Picker("Container details", selection: $model.containerTab) {
+          ForEach(ContainerPageTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
         }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 410).padding(.vertical, 18)
           .accessibilityIdentifier("container.tabs")
         if let error = model.detailsError { StatusMessage(text: error).padding(.bottom, 12) }
@@ -102,12 +96,20 @@ struct ContainerDetailView: View {
         }
         .help("Refresh container details").disabled(model.busy || model.detailsLoading)
         .accessibilityIdentifier("container.refresh")
-        if let folder = c.folder, !model.sample {
+        if c.running {
           Button {
-            NSWorkspace.shared.open(folder)
+            Launcher.shell(c, model: model)
           } label: {
-            Label("Folder", systemImage: "folder")
-          }
+            Label("Shell", systemImage: "terminal")
+          }.disabled(model.sample).help("Open an interactive shell in Terminal")
+            .accessibilityIdentifier("container.shell")
+        }
+        if let origin = c.origin {
+          Menu {
+            OriginMenuItems(model: model, origin: origin)
+          } label: {
+            Label("Project folder", systemImage: "folder")
+          }.fixedSize().help(origin.displayPath)
         }
         Button(c.running ? "Stop…" : "Start…") {
           model.request(c.running ? "stop" : "start", containers: [c])
@@ -117,11 +119,10 @@ struct ContainerDetailView: View {
           .disabled(!c.running || model.busy || model.sample).accessibilityIdentifier(
             "container.restart")
       }
-      HStack(spacing: 24) {
-        Label(
-          c.status, systemImage: c.needsAttention ? "exclamationmark.triangle.fill" : "circle.fill"
-        )
-        .foregroundStyle(c.needsAttention ? .orange : c.running ? .teal : .secondary)
+      HStack(spacing: 16) {
+        ConditionPill(condition: c.condition)
+        Text(c.uptime).foregroundStyle(.secondary)
+        if !c.publishedPorts.isEmpty { PortChips(ports: c.publishedPorts, limit: 6) }
         if let metric = model.snapshot?.metric(for: c) {
           Text("CPU " + metric.cpuPercent).monospacedDigit()
           Text("Memory " + memoryText(metric.memoryBytes)).monospacedDigit()

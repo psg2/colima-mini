@@ -32,20 +32,24 @@ struct SidebarView: View {
           }
           Text("Colima Mini").font(.system(.title3, design: .rounded).weight(.semibold))
         }
-        Label(model.snapshot?.vm.status ?? "Connecting…", systemImage: "circle.fill")
-          .font(.caption).foregroundStyle(model.snapshot?.vm.running == true ? .teal : .secondary)
+        HStack(spacing: 6) {
+          Circle().fill(model.snapshot?.vm.running == true ? Color.green : Color.secondary)
+            .frame(width: 7, height: 7)
+          Text(model.snapshot?.vm.status ?? "Connecting…").fontWeight(.medium)
+          Spacer()
+          if let vm = model.snapshot?.vm {
+            Button(vm.running ? "Stop" : "Start") {
+              model.request(vm.running ? "stop" : "start", containers: [], vm: true)
+            }
+            .controlSize(.small).disabled(model.busy || model.sample)
+            .accessibilityIdentifier(vm.running ? "vm.stop" : "vm.start")
+          }
+        }.font(.callout)
         Text(model.snapshot?.vm.allocation ?? "Default profile").font(.caption).foregroundStyle(
           .secondary)
-        HStack {
-          Button("Start") { model.request("start", containers: [], vm: true) }
-            .disabled(model.snapshot?.vm.running != false || model.busy || model.sample)
-            .accessibilityIdentifier("vm.start")
-          Button("Stop") { model.request("stop", containers: [], vm: true) }
-            .disabled(model.snapshot?.vm.running != true || model.busy || model.sample)
-            .accessibilityIdentifier("vm.stop")
-        }
       }.padding(20)
       List(selection: selection) {
+        navigationRow("Overview", symbol: "gauge.with.dots.needle.33percent", route: .overview)
         navigationRow(
           "Containers", symbol: "shippingbox", route: .containers, count: model.containers.count)
         navigationRow("Volumes", symbol: "externaldrive", route: .volumes)
@@ -53,13 +57,23 @@ struct SidebarView: View {
         navigationRow("Storage", symbol: "chart.pie", route: .storage)
         Section("Projects") {
           ForEach(model.snapshot?.projects ?? [], id: \.self) { project in
+            let origin = model.origin(of: project)
             HStack {
-              Label(project, systemImage: project == "Standalone" ? "shippingbox" : "folder")
-                .lineLimit(1).truncationMode(.middle)
+              Label(
+                project,
+                systemImage: project == "Standalone"
+                  ? "shippingbox" : origin?.kind.symbol ?? "folder"
+              )
+              .lineLimit(1).truncationMode(.middle)
               Spacer()
+              if model.containers.contains(where: { $0.project == project && $0.needsAttention }) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                  .font(.caption)
+              }
               Text("\(model.containers.filter { $0.project == project }.count)")
                 .foregroundStyle(.secondary).monospacedDigit()
-            }.tag(SidebarSelection.project(project))
+            }.help(origin.map { $0.summary + "\n" + $0.displayPath } ?? project)
+              .tag(SidebarSelection.project(project))
           }
         }
       }.listStyle(.sidebar)
