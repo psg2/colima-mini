@@ -72,6 +72,10 @@ search loaded objects and pages. Type an action such as `restart`, `shell` or `l
 to act on a container. Use the arrow keys to choose a result and Return to open it.
 Settings stays aligned at the bottom and is also available with **Command+,**.
 
+Closing the window keeps Colima Mini in the menu bar and, by default, removes
+its Dock icon; opening the dashboard from the menu brings the icon back. Turn
+this off in Settings to keep the Dock icon.
+
 ### Keyboard shortcuts
 
 The **Go** and **Container** menus list every shortcut.

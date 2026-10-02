@@ -16,6 +16,7 @@ struct SettingsView: View {
   @State private var confirming = false
   @State private var loginEnabled = SMAppService.mainApp.status == .enabled
   @State private var loginError: String?
+  @AppStorage(DockIcon.settingKey) private var hideDockWhenClosed = true
   @State private var folderApp = ExternalApps.folderDefault?.id ?? ""
   @State private var terminalApp = ExternalApps.terminal?.id ?? ""
   private var loginItem: Binding<Bool> {
@@ -235,6 +236,11 @@ struct SettingsView: View {
             .disabled(model.sample).accessibilityIdentifier("settings.notifications")
           Text(
             "Unexpected exits, failing health checks and restart loops. Changes made from Colima Mini don't notify."
+          ).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+          Divider()
+          Toggle("Hide the Dock icon while the window is closed", isOn: $hideDockWhenClosed)
+          Text(
+            "Colima Mini stays in the menu bar; opening the dashboard brings the Dock icon back."
           ).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
           Divider()
           Toggle("Open at login", isOn: loginItem).disabled(model.sample)
