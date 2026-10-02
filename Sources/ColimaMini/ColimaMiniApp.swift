@@ -5,6 +5,7 @@ import Foundation
 import SwiftUI
 
 @main struct ColimaMiniApp: App {
+  @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   @StateObject private var model: Dashboard
   private let sample: Bool
   init() {
