@@ -55,7 +55,7 @@ struct DashboardView: View {
       titleVisibility: .visible
     ) {
       if let action = model.pending {
-        Button(action.label, role: action.verb == "start" ? nil : .destructive) {
+        Button(action.label, role: action.destructive ? .destructive : nil) {
           Task { await model.perform(action) }
         }
       }

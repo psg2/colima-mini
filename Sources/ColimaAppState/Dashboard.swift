@@ -9,14 +9,22 @@ package struct PendingAction: Identifiable {
   package let verb: String
   package let containers: [Container]
   package let vm: Bool
+  package let compose: ComposeAction?
   // The confirmation button's title.
-  package var label: String { verb == "rm" ? "Remove" : verb.capitalized }
-  package init(title: String, message: String, verb: String, containers: [Container], vm: Bool) {
+  package var label: String {
+    compose?.title ?? (verb == "rm" ? "Remove" : verb.capitalized)
+  }
+  package var destructive: Bool { compose?.destructive ?? (verb != "start") }
+  package init(
+    title: String, message: String, verb: String, containers: [Container], vm: Bool,
+    compose: ComposeAction? = nil
+  ) {
     self.title = title
     self.message = message
     self.verb = verb
     self.containers = containers
     self.vm = vm
+    self.compose = compose
   }
 }
 
@@ -470,6 +478,19 @@ package struct PendingAction: Identifiable {
             ? "\n\nIts logs and container files are deleted. Volumes are kept." : ""),
       verb: verb, containers: containers, vm: vm)
   }
+  // Compose runs against the whole project, including services that have no
+  // container yet, so the dialog names the folder rather than containers.
+  package func requestCompose(_ action: ComposeAction, project: String) {
+    let members = containers.filter {
+      $0.project == project && $0.label("com.docker.compose.project") != nil
+    }
+    guard !sample, !busy, let first = members.first else { return }
+    let folder = first.origin?.displayPath ?? "an unknown folder"
+    pending = PendingAction(
+      title: "\(action.title) \(project)?",
+      message: action.explanation + "\n\nFolder: " + folder,
+      verb: "compose", containers: members, vm: false, compose: action)
+  }
   package func perform(_ action: PendingAction) async {
     guard !busy, !sample else { return }
     invalidateRefresh()
@@ -480,7 +501,10 @@ package struct PendingAction: Identifiable {
     for container in action.vm ? containers : action.containers { actedOn[container.id] = now }
     var actionError: String?
     do {
-      if action.vm {
+      if let compose = action.compose, let first = action.containers.first {
+        let project = try await backend.composeProject(first.project, containerID: first.id)
+        try await backend.compose(compose, project: project)
+      } else if action.vm {
         _ = try await backend.vm(action.verb)
       } else if !action.containers.isEmpty {
         _ = try await backend.docker([action.verb] + action.containers.map(\.id), timeout: 90)
