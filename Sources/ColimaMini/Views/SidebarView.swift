@@ -74,8 +74,13 @@ struct SidebarView: View {
               }
               Text("\(model.containers.filter { $0.project == project }.count)")
                 .foregroundStyle(.secondary).monospacedDigit()
-            }.help(origin.map { $0.summary + "\n" + $0.displayPath } ?? project)
+            }.contentShape(Rectangle())
+              .help(origin.map { $0.summary + "\n" + $0.displayPath } ?? project)
               .tag(SidebarSelection.project(project))
+              .simultaneousGesture(
+                TapGesture().onEnded {
+                  if model.canGoBack { model.navigate(.containers, project: project) }
+                })
           }
         }
       }.listStyle(.sidebar)
@@ -95,6 +100,14 @@ struct SidebarView: View {
       Label(title, systemImage: symbol)
       Spacer()
       if let count { Text("\(count)").foregroundStyle(.secondary).monospacedDigit() }
-    }.tag(SidebarSelection.section(route))
+    }.contentShape(Rectangle()).tag(SidebarSelection.section(route))
+      // A detail page keeps its section selected, so a click on that row is no
+      // selection change; navigate explicitly to return to the list.
+      .simultaneousGesture(
+        TapGesture().onEnded {
+          if model.route != route || model.canGoBack {
+            model.navigate(route, project: route == .containers ? "All containers" : nil)
+          }
+        })
   }
 }

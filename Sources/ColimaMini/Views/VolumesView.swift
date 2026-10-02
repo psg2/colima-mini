@@ -94,12 +94,7 @@ struct VolumeDetailView: View {
   var volume: Volume? { model.volumes.first { $0.name == name } }
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
-      Button {
-        model.goBack()
-      } label: {
-        Label("Back", systemImage: "chevron.left")
-      }
-      .buttonStyle(.plain).foregroundStyle(.secondary).accessibilityIdentifier("volume.back")
+      BackButton(model: model, identifier: "volume.back")
       HStack {
         VStack(alignment: .leading, spacing: 6) {
           Text(name).font(.system(.title, design: .rounded).weight(.semibold)).textSelection(

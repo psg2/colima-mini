@@ -92,6 +92,7 @@ package struct PendingAction: Identifiable {
   @Published package var images: [DockerImage] = []
   @Published package var imagesError: String?
   @Published package var imagesLoading = false
+  @Published package var imageActivity: String?
   @Published package var imagesDate: Date?
   @Published package var storage: StorageSnapshot?
   @Published package var storageError: String?
@@ -230,6 +231,22 @@ package struct PendingAction: Identifiable {
   package func openImage(_ id: String) {
     backRoutes.append(route)
     route = .image(id)
+  }
+  // Where Back leads, named for its button.
+  package var backTitle: String {
+    switch backRoutes.last ?? .containers {
+    case .overview: return "Overview"
+    case .containers: return project == "All containers" ? "Containers" : project
+    case .container(let id): return containers.first { $0.id == id }?.service ?? "Container"
+    case .projectLogs(let project): return project + " logs"
+    case .volumes: return "Volumes"
+    case .volume(let name): return name
+    case .images: return "Images"
+    case .image(let id): return images.first { $0.id == id }?.name ?? "Image"
+    case .networks: return "Networks"
+    case .storage: return "Storage"
+    case .settings: return "Settings"
+    }
   }
   package func goBack() {
     route = backRoutes.popLast() ?? .containers
@@ -440,6 +457,26 @@ package struct PendingAction: Identifiable {
       volumesDate = Date()
       volumesError = nil
     } catch is CancellationError {} catch { volumesError = error.localizedDescription }
+  }
+  // Pull or remove one image, then measure images again.
+  package func changeImage(_ image: DockerImage, pull: Bool) async {
+    guard !busy, !sample else { return }
+    busy = true
+    imageActivity = (pull ? "Pulling " : "Removing ") + image.name + "…"
+    do {
+      if pull {
+        try await backend.pullImage(image)
+      } else {
+        try await backend.removeImage(image)
+      }
+      imagesError = nil
+    } catch {
+      imagesError =
+        "Could not \(pull ? "pull" : "remove") \(image.name): " + error.localizedDescription
+    }
+    imageActivity = nil
+    busy = false
+    await loadImages()
   }
   package func loadImages() async {
     guard !imagesLoading else { return }

@@ -29,3 +29,25 @@ package struct DockerImage: Codable, Identifiable {
     return containers.filter { canonical($0.imageID) == full }.map(\.id).sorted()
   }
 }
+
+extension DockerImage {
+  // The reference Docker should act on: the tag, or the ID for an untagged image.
+  package var reference: String {
+    repository == "<none>" || tag == "<none>" ? imageID : name
+  }
+  package var unused: Bool { referencesAvailable && containerIDs.isEmpty }
+}
+
+extension Backend {
+  // Untags, and deletes the image once no tag is left. Without --force, Docker
+  // refuses an image any container, running or stopped, still uses.
+  package func removeImage(_ image: DockerImage) async throws {
+    _ = try await docker(["image", "rm", image.reference], timeout: 60)
+  }
+  package func pullImage(_ image: DockerImage) async throws {
+    guard image.reference == image.name else {
+      throw AppError.message("An untagged image has nothing to pull.")
+    }
+    _ = try await docker(["pull", "--quiet", image.name], timeout: 600)
+  }
+}

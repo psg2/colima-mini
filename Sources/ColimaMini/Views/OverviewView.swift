@@ -93,7 +93,6 @@ struct OverviewView: View {
     if let runtime = vm.runtime { parts.append(runtime) }
     if let arch = vm.arch { parts.append(arch) }
     parts.append(vm.allocation)
-    if let disk = vm.disk, disk > 0 { parts.append(bytesText(Double(disk)) + " disk") }
     return parts.joined(separator: " · ")
   }
   private var attention: some View {

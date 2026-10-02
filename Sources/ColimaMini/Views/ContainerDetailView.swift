@@ -14,13 +14,7 @@ struct ContainerDetailView: View {
   var polling: Bool { tab == .logs && !model.logsPaused && scenePhase == .active }
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Button {
-        model.goBack()
-      } label: {
-        Label("Back", systemImage: "chevron.left")
-      }
-      .buttonStyle(.plain).foregroundStyle(.secondary).padding(.bottom, 18)
-      .accessibilityIdentifier("container.back")
+      BackButton(model: model, identifier: "container.back").padding(.bottom, 18)
       if let container {
         header(container)
         Picker("Container details", selection: $model.containerTab) {

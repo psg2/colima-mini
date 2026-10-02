@@ -93,13 +93,7 @@ struct ProjectLogsView: View {
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Button {
-        model.goBack()
-      } label: {
-        Label("Back", systemImage: "chevron.left")
-      }
-      .buttonStyle(.plain).foregroundStyle(.secondary)
-      .accessibilityIdentifier("projectLogs.back")
+      BackButton(model: model, identifier: "projectLogs.back")
       VStack(alignment: .leading, spacing: 5) {
         Text(project).font(.system(.title, design: .rounded).weight(.semibold))
         Text(
