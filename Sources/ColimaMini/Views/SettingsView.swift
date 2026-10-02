@@ -60,6 +60,33 @@ struct SettingsView: View {
       error = nil
     } catch { self.error = error.localizedDescription }
   }
+  private func diskControl(_ configured: Int) -> some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack {
+        Text("Disk")
+        Spacer()
+        Text(
+          Int(disk) == configured
+            ? "\(configured) GiB of \(ResourceSettings.hostDisk) GiB"
+            : "\(configured) → \(Int(disk)) GiB"
+        ).monospacedDigit()
+      }
+      Slider(
+        value: Binding(get: { disk }, set: { disk = ($0 / 10).rounded() * 10 }),
+        in: diskRange
+      )
+      .accessibilityLabel("Disk in GiB").accessibilityIdentifier("settings.disk")
+      Text(
+        "Colima grows the data disk on the next start and can't shrink it. The disk image is sparse, so it only occupies what containers write."
+      ).font(.caption).foregroundStyle(.secondary).fixedSize(
+        horizontal: false, vertical: true)
+    }
+  }
+  private var currentVM: String? {
+    guard let vm = model.snapshot?.vm else { return nil }
+    return "Current VM: " + vm.allocation
+      + (vm.disk.map { " · " + bytesText(Double($0)) + " disk" } ?? "")
+  }
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
       HStack {
@@ -95,26 +122,7 @@ struct SettingsView: View {
             in: 1...Double(max(2, ResourceSettings.hostMemory))
           )
           .accessibilityLabel("Memory in GiB").accessibilityIdentifier("settings.memory")
-          if let configured = saved?.diskGiB {
-            HStack {
-              Text("Disk")
-              Spacer()
-              Text(
-                Int(disk) == configured
-                  ? "\(configured) GiB of \(ResourceSettings.hostDisk) GiB"
-                  : "\(configured) → \(Int(disk)) GiB"
-              ).monospacedDigit()
-            }
-            Slider(
-              value: Binding(get: { disk }, set: { disk = ($0 / 10).rounded() * 10 }),
-              in: diskRange
-            )
-            .accessibilityLabel("Disk in GiB").accessibilityIdentifier("settings.disk")
-            Text(
-              "Colima grows the data disk on the next start and can't shrink it. The disk image is sparse, so it only occupies what containers write."
-            ).font(.caption).foregroundStyle(.secondary).fixedSize(
-              horizontal: false, vertical: true)
-          }
+          if let configured = saved?.diskGiB { diskControl(configured) }
           HStack {
             Text("Presets").font(.caption).foregroundStyle(.secondary)
             Button("Light") {
@@ -132,10 +140,7 @@ struct SettingsView: View {
           }
           Divider()
           if let vm = model.snapshot?.vm {
-            Text(
-              "Current VM: " + vm.allocation
-                + (vm.disk.map { " · " + bytesText(Double($0)) + " disk" } ?? "")
-            ).font(.caption).foregroundStyle(.secondary)
+            Text(currentVM ?? "").font(.caption).foregroundStyle(.secondary)
             if !changed && differsFromVM {
               Text("Saved changes are waiting for the next start.").font(.caption).foregroundStyle(
                 .orange)
