@@ -3,9 +3,13 @@ import Foundation
 package struct ResourceSettings: Equatable {
   package let cpus: Int
   package let memoryGiB: Double
-  package init(cpus: Int, memoryGiB: Double) {
+  // Colima can grow its data disk on the next start but never shrink it, so
+  // saving rejects a smaller value. Nil leaves the configured size alone.
+  package let diskGiB: Int?
+  package init(cpus: Int, memoryGiB: Double, diskGiB: Int? = nil) {
     self.cpus = cpus
     self.memoryGiB = memoryGiB
+    self.diskGiB = diskGiB
   }
   package static var configurationURL: URL {
     let home =
@@ -15,20 +19,28 @@ package struct ResourceSettings: Equatable {
   }
   package static var hostCPUs: Int { ProcessInfo.processInfo.processorCount }
   package static var hostMemory: Int { Int(ProcessInfo.processInfo.physicalMemory / 1_073_741_824) }
+  // The disk image is sparse, so its size can exceed free space; cap it at the
+  // Mac's own volume size.
+  package static var hostDisk: Int {
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    let bytes = (try? home.resourceValues(forKeys: [.volumeTotalCapacityKey]))?.volumeTotalCapacity
+    return (bytes ?? 0) / 1_073_741_824
+  }
   package func validate(maxCPUs: Int = Self.hostCPUs, maxMemory: Int = Self.hostMemory) throws {
     guard maxCPUs > 0, maxMemory > 0, (1...maxCPUs).contains(cpus),
-      memoryGiB.isFinite, (1...Double(maxMemory)).contains(memoryGiB)
+      memoryGiB.isFinite, (1...Double(maxMemory)).contains(memoryGiB), (diskGiB ?? 1) > 0
     else {
       throw AppError.message("Choose 1–\(maxCPUs) CPUs and 1–\(maxMemory) GiB of memory.")
     }
   }
   package static func read(from url: URL = configurationURL) throws -> ResourceSettings {
     let text = try String(contentsOf: url, encoding: .utf8)
-    func scalar(_ key: String) throws -> Double {
+    func scalar(_ key: String, optional: Bool = false) throws -> Double? {
       let regex = try NSRegularExpression(
         pattern: "(?m)^" + key + #":[ \t]*([0-9]+(?:\.[0-9]+)?)[ \t]*(?:#.*)?$"#)
       let range = NSRange(text.startIndex..., in: text)
       let matches = regex.matches(in: text, range: range)
+      if optional && matches.isEmpty { return nil }
       guard matches.count == 1, let number = Range(matches[0].range(at: 1), in: text),
         let value = Double(text[number]), value.isFinite, value > 0
       else {
@@ -36,17 +48,31 @@ package struct ResourceSettings: Equatable {
       }
       return value
     }
-    let cpus = try scalar("cpu")
-    guard cpus.rounded() == cpus, cpus < Double(Int.max) else {
-      throw AppError.message("CPU allocation must be a whole number.")
+    func whole(_ value: Double, _ what: String) throws -> Int {
+      guard value.rounded() == value, value < Double(Int.max) else {
+        throw AppError.message("\(what) must be a whole number.")
+      }
+      return Int(value)
     }
-    return try ResourceSettings(cpus: Int(cpus), memoryGiB: scalar("memory"))
+    let cpus = try whole(scalar("cpu")!, "CPU allocation")
+    let disk = try scalar("disk", optional: true).map { try whole($0, "Disk size") }
+    return try ResourceSettings(cpus: cpus, memoryGiB: scalar("memory")!, diskGiB: disk)
   }
   package func save(to url: URL = Self.configurationURL) throws {
     try validate()
     var text = try String(contentsOf: url, encoding: .utf8)
-    _ = try Self.read(from: url)
-    for (key, value) in [("cpu", String(cpus)), ("memory", String(memoryGiB))] {
+    let current = try Self.read(from: url)
+    var values = [("cpu", String(cpus)), ("memory", String(memoryGiB))]
+    if let diskGiB, diskGiB != current.diskGiB {
+      guard let configured = current.diskGiB else {
+        throw AppError.message("Cannot read disk from the Colima configuration.")
+      }
+      guard diskGiB > configured else {
+        throw AppError.message("Colima can't shrink its disk below \(configured) GiB.")
+      }
+      values.append(("disk", String(diskGiB)))
+    }
+    for (key, value) in values {
       let regex = try NSRegularExpression(
         pattern: "(?m)^" + key + #":[ \t]*([0-9]+(?:\.[0-9]+)?)[ \t]*(?:#.*)?$"#)
       guard let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),

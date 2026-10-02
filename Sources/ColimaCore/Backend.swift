@@ -15,7 +15,9 @@ package struct Backend {
   package func settings() throws -> ResourceSettings {
     if let fixture {
       let vm = try fixture.snapshot.vm
-      return ResourceSettings(cpus: vm.cpus, memoryGiB: Double(vm.memory) / 1_073_741_824)
+      return ResourceSettings(
+        cpus: vm.cpus, memoryGiB: Double(vm.memory) / 1_073_741_824,
+        diskGiB: vm.disk.map { Int($0 / 1_073_741_824) })
     }
     return try ResourceSettings.read(from: configurationURL)
   }
@@ -53,7 +55,10 @@ package struct Backend {
     _ = try await command(
       "colima", ["start", "default", "--activate=false", "--save-config=false"], timeout: 240)
     let after = try await inventory()
-    guard after.vm.running, after.vm.cpus == resources.cpus,
+    let diskApplied =
+      resources.diskGiB.map { want in after.vm.disk.map { $0 >= Int64(want) << 30 } ?? true }
+      ?? true
+    guard after.vm.running, diskApplied, after.vm.cpus == resources.cpus,
       abs(Double(after.vm.memory) / 1_073_741_824 - resources.memoryGiB) < 0.01
     else {
       throw AppError.message(
