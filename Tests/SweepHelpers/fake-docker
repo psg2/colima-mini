@@ -8,6 +8,8 @@ import json, os, sys
 
 state = json.load(open(os.environ["FAKE_DOCKER_STATE"]))
 args = sys.argv[1:]
+if os.environ.get("FAKE_DOCKER_FAIL") == args[0]:
+    sys.exit("synthetic Docker failure")
 
 def record():
     with open(os.environ["FAKE_DOCKER_LOG"], "a") as log:
@@ -21,6 +23,10 @@ elif args[0] == "logs":
     line = state["logs"].get(args[-1], "")
     # Mirror images that log to stderr, as Postgres does.
     print(line, file=sys.stderr if state.get("logs_to_stderr") else sys.stdout)
+elif args[0] == "stats":
+    for container in state["containers"]:
+        if container["State"]["Running"]:
+            print(container["Id"] + "\t0B / 0B")
 elif args[:2] == ["network", "ls"]:
     project = args[-1].rsplit("=", 1)[-1]
     print(state["networks"].get(project, ""))

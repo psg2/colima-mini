@@ -1,4 +1,5 @@
 import AppKit
+import ColimaAppState
 import ColimaCore
 import Combine
 import Foundation
@@ -12,8 +13,7 @@ struct ProjectSection: View {
     Binding(
       get: { !model.search.isEmpty || !model.collapsed.contains(project) },
       set: { value in
-        if value { model.collapsed.remove(project) } else { model.collapsed.insert(project) }
-        model.savePreferences()
+        model.setGroupExpanded(project, expanded: value)
       })
   }
   var body: some View {

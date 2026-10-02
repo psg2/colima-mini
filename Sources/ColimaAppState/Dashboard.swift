@@ -1,0 +1,369 @@
+import ColimaCore
+import Combine
+import Foundation
+
+package struct PendingAction: Identifiable {
+  package let id = UUID()
+  package let title: String
+  package let message: String
+  package let verb: String
+  package let containers: [Container]
+  package let vm: Bool
+  package init(title: String, message: String, verb: String, containers: [Container], vm: Bool) {
+    self.title = title
+    self.message = message
+    self.verb = verb
+    self.containers = containers
+    self.vm = vm
+  }
+}
+
+@MainActor package final class Dashboard: ObservableObject {
+  package let backend: Backend
+  private let readSnapshot: () async throws -> Snapshot
+  private let readLogs: (String) async throws -> String
+  private let readDetails: (String) async throws -> ContainerDetails
+  private let readVolumes: () async throws -> [Volume]
+  private var refreshTask: Task<Snapshot, Error>?
+  private var refreshGeneration = 0
+  private var logGeneration = 0
+  private var detailsGeneration = 0
+  private var backRoutes: [AppRoute] = []
+  @Published package var route = AppRoute.containers
+  @Published package var snapshot: Snapshot?
+  @Published package var error: String?
+  @Published package var refreshing = false
+  @Published package var busy = false
+  @Published package var lastRefresh: Date?
+  @Published package var selectedID: String?
+  @Published package var project = "All containers"
+  @Published package var search = ""
+  @Published package var listScrollID: String?
+  @Published package var volumeSearch = ""
+  @Published package var imageSearch = ""
+  @Published package var unattachedOnly = false
+  @Published package var volumeSortBySize = false
+  @Published package var logs = ""
+  @Published package var logError: String?
+  @Published package var logsLoading = false
+  @Published package var logsPaused = false
+  @Published package var logsDate: Date?
+  @Published package var sweepReport = "Run a scan to find orphaned, stale or idle containers."
+  @Published package var scanning = false
+  @Published package var showingSweep = false
+  @Published package var pending: PendingAction?
+  @Published package var onlyRunning = false
+  @Published package var grouped = true
+  @Published package var collapsed: Set<String> = []
+  @Published package var settingsMessage: String?
+  @Published package var applyingResources = false
+  @Published package var refreshInterval = 5
+  @Published package var details: ContainerDetails?
+  @Published package var detailsError: String?
+  @Published package var detailsLoading = false
+  @Published package var detailsDate: Date?
+  @Published package var volumes: [Volume] = []
+  @Published package var volumesError: String?
+  @Published package var volumesLoading = false
+  @Published package var volumesDate: Date?
+  @Published package var images: [DockerImage] = []
+  @Published package var imagesError: String?
+  @Published package var imagesLoading = false
+  @Published package var imagesDate: Date?
+  @Published package var storage: StorageSnapshot?
+  @Published package var storageError: String?
+  @Published package var storageLoading = false
+  @Published package var history: [String: [MetricSample]] = [:]
+
+  package init(
+    backend: Backend,
+    readSnapshot: (() async throws -> Snapshot)? = nil,
+    readLogs: ((String) async throws -> String)? = nil,
+    readDetails: ((String) async throws -> ContainerDetails)? = nil,
+    readVolumes: (() async throws -> [Volume])? = nil
+  ) {
+    self.backend = backend
+    self.readSnapshot = readSnapshot ?? { try await backend.snapshot() }
+    self.readLogs = readLogs ?? { try await backend.logs($0) }
+    self.readDetails = readDetails ?? { try await backend.details($0) }
+    self.readVolumes = readVolumes ?? { try await backend.volumes() }
+    if backend.fixture == nil {
+      let defaults = UserDefaults.standard
+      onlyRunning = defaults.bool(forKey: "onlyRunning")
+      grouped = defaults.object(forKey: "grouped") == nil || defaults.bool(forKey: "grouped")
+      collapsed = Set(defaults.stringArray(forKey: "collapsedProjects") ?? [])
+      let interval = defaults.integer(forKey: "refreshInterval")
+      refreshInterval = [5, 10, 30, 60].contains(interval) ? interval : 5
+    }
+  }
+  package func savePreferences() {
+    guard !sample else { return }
+    let defaults = UserDefaults.standard
+    defaults.set(onlyRunning, forKey: "onlyRunning")
+    defaults.set(grouped, forKey: "grouped")
+    defaults.set(Array(collapsed), forKey: "collapsedProjects")
+    defaults.set(refreshInterval, forKey: "refreshInterval")
+  }
+  package var sample: Bool { backend.fixture != nil }
+  package var containers: [Container] { snapshot?.containers ?? [] }
+  package var selected: Container? { containers.first { $0.id == selectedID } }
+  package var visible: [Container] {
+    containers.filter {
+      (project == "All containers" || $0.project == project) && (!onlyRunning || $0.running)
+        && (search.isEmpty
+          || "\($0.name) \($0.image) \($0.project)".localizedCaseInsensitiveContains(search))
+    }
+  }
+  package var allVisibleGroupsCollapsed: Bool {
+    !visible.isEmpty && visible.allSatisfy { collapsed.contains($0.project) }
+  }
+  package func setGroupExpanded(_ project: String, expanded: Bool) {
+    guard search.isEmpty else { return }
+    if expanded { collapsed.remove(project) } else { collapsed.insert(project) }
+    savePreferences()
+  }
+  package func toggleVisibleGroups() {
+    guard search.isEmpty else { return }
+    let projects = Set(visible.map(\.project))
+    if allVisibleGroupsCollapsed {
+      collapsed.subtract(projects)
+    } else {
+      collapsed.formUnion(projects)
+    }
+    savePreferences()
+  }
+  package func navigate(_ target: AppRoute, project: String? = nil) {
+    logGeneration += 1
+    logsLoading = false
+    if let project {
+      self.project = project
+      search = ""
+    }
+    route = target
+    backRoutes.removeAll()
+    selectedID = nil
+  }
+  package func openContainer(_ id: String) {
+    backRoutes.append(route)
+    route = .container(id)
+    selectedID = id
+    detailsGeneration += 1
+    detailsLoading = false
+    details = nil
+    detailsDate = nil
+    detailsError = nil
+    resetLogs()
+  }
+  package func openVolume(_ name: String) {
+    backRoutes.append(route)
+    route = .volume(name)
+    logGeneration += 1
+    logsLoading = false
+  }
+  package func openImage(_ id: String) {
+    backRoutes.append(route)
+    route = .image(id)
+  }
+  package func goBack() {
+    route = backRoutes.popLast() ?? .containers
+    if case .container(let id) = route {
+      selectedID = id
+      detailsGeneration += 1
+      details = nil
+      detailsDate = nil
+      detailsError = nil
+      detailsLoading = false
+      resetLogs()
+    } else {
+      selectedID = nil
+    }
+    logGeneration += 1
+    logsLoading = false
+  }
+  package func resetLogs() {
+    logGeneration += 1
+    logs = ""
+    logError = nil
+    logsDate = nil
+    logsLoading = false
+    logsPaused = false
+  }
+  package func invalidateRefresh() {
+    refreshGeneration += 1
+    refreshTask?.cancel()
+    refreshTask = nil
+    refreshing = false
+  }
+  package func refresh() async {
+    guard !refreshing, !busy else { return }
+    refreshGeneration += 1
+    let generation = refreshGeneration
+    refreshing = true
+    let task = Task { try await readSnapshot() }
+    refreshTask = task
+    defer {
+      if generation == refreshGeneration {
+        refreshing = false
+        refreshTask = nil
+      }
+    }
+    do {
+      let updated = try await task.value
+      guard generation == refreshGeneration, !Task.isCancelled, !busy else { return }
+      snapshot = updated
+      error = nil
+      let date = Date()
+      lastRefresh = date
+      for container in updated.containers {
+        if let metric = updated.metric(for: container) {
+          var samples = history[container.id] ?? []
+          samples.append(MetricSample(date: date, cpu: metric.cpu, memory: metric.memoryBytes))
+          history[container.id] = Array(samples.suffix(60))
+        }
+      }
+      history = history.filter { key, _ in updated.containers.contains { $0.id == key } }
+      if project != "All containers" && !updated.projects.contains(project) {
+        project = "All containers"
+      }
+    } catch is CancellationError {} catch {
+      if generation == refreshGeneration, !Task.isCancelled {
+        self.error = error.localizedDescription
+      }
+    }
+  }
+  package func loadLogs(_ id: String) async {
+    guard route == .container(id), !logsPaused else { return }
+    logGeneration += 1
+    let generation = logGeneration
+    logsLoading = true
+    defer { if generation == logGeneration { logsLoading = false } }
+    do {
+      let text = try await readLogs(id)
+      guard generation == logGeneration, route == .container(id), !Task.isCancelled, !logsPaused
+      else { return }
+      logs = text
+      logError = nil
+      logsDate = Date()
+    } catch is CancellationError {} catch {
+      guard generation == logGeneration, route == .container(id), !Task.isCancelled else { return }
+      logError = error.localizedDescription
+    }
+  }
+  package func loadDetails(_ id: String) async {
+    guard route == .container(id) else { return }
+    detailsGeneration += 1
+    let generation = detailsGeneration
+    detailsLoading = true
+    defer { if generation == detailsGeneration { detailsLoading = false } }
+    do {
+      let result = try await readDetails(id)
+      guard route == .container(id), generation == detailsGeneration, !Task.isCancelled else {
+        return
+      }
+      details = result
+      detailsDate = Date()
+      detailsError = nil
+    } catch is CancellationError {} catch {
+      if route == .container(id), generation == detailsGeneration, !Task.isCancelled {
+        detailsError = error.localizedDescription
+      }
+    }
+  }
+  package func loadVolumes() async {
+    guard !volumesLoading else { return }
+    volumesLoading = true
+    defer { volumesLoading = false }
+    do {
+      // Inventory belongs to the shared model, not the page that requested it.
+      // A page may disappear while its read continues to populate this cache.
+      let task = Task { try await readVolumes() }
+      let result = try await task.value
+      volumes = result
+      volumesDate = Date()
+      volumesError = nil
+    } catch is CancellationError {} catch { volumesError = error.localizedDescription }
+  }
+  package func loadImages() async {
+    guard !imagesLoading else { return }
+    imagesLoading = true
+    defer { imagesLoading = false }
+    do {
+      let task = Task { try await backend.images() }
+      let result = try await task.value
+      images = result
+      imagesDate = Date()
+      imagesError = nil
+    } catch is CancellationError {} catch { imagesError = error.localizedDescription }
+  }
+  package func loadStorage() async {
+    guard !storageLoading else { return }
+    storageLoading = true
+    defer { storageLoading = false }
+    do {
+      let task = Task { try await backend.storage() }
+      let result = try await task.value
+      storage = result
+      storageError = nil
+    } catch is CancellationError {} catch { storageError = error.localizedDescription }
+  }
+  package func request(_ verb: String, containers: [Container], vm: Bool = false) {
+    guard !sample, !busy, vm || !containers.isEmpty else { return }
+    let targets =
+      vm
+      ? "Colima" : (containers.count == 1 ? containers[0].name : "\(containers.count) containers")
+    pending = PendingAction(
+      title: "\(verb.capitalized) \(targets)?",
+      message: vm
+        ? "This affects every container in Colima. Your Docker volumes are kept."
+        : containers.map(\.name).joined(separator: "\n"),
+      verb: verb, containers: containers, vm: vm)
+  }
+  package func perform(_ action: PendingAction) async {
+    guard !busy, !sample else { return }
+    invalidateRefresh()
+    busy = true
+    error = nil
+    pending = nil
+    var actionError: String?
+    do {
+      if action.vm {
+        _ = try await backend.vm(action.verb)
+      } else if !action.containers.isEmpty {
+        _ = try await backend.docker([action.verb] + action.containers.map(\.id), timeout: 90)
+      }
+    } catch { actionError = error.localizedDescription }
+    busy = false
+    await refresh()
+    if case .container(let id) = route { await loadDetails(id) }
+    if let actionError { error = actionError }
+  }
+  package func changeResources(_ resources: ResourceSettings, restart: Bool) async {
+    guard !busy, !sample, snapshot != nil else { return }
+    invalidateRefresh()
+    busy = true
+    applyingResources = true
+    settingsMessage = nil
+    defer {
+      applyingResources = false
+      busy = false
+    }
+    do {
+      try await backend.apply(resources, restart: restart)
+      settingsMessage =
+        restart
+        ? "Resources applied. Previously running containers were restored."
+        : "Saved. These resources take effect the next time Colima starts."
+    } catch { settingsMessage = "Could not apply resources: " + error.localizedDescription }
+    busy = false
+    await refresh()
+  }
+  package func scan() async {
+    guard !scanning, !busy else { return }
+    scanning = true
+    showingSweep = true
+    defer { scanning = false }
+    do { sweepReport = try await backend.sweep() } catch {
+      sweepReport = "Scan failed: " + error.localizedDescription
+    }
+  }
+}

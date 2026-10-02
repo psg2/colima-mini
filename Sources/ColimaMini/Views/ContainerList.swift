@@ -1,4 +1,5 @@
 import AppKit
+import ColimaAppState
 import ColimaCore
 import Combine
 import Foundation
@@ -35,8 +36,8 @@ struct ContainerList: View {
           } else {
             ForEach(model.visible) { ContainerRow(model: model, container: $0, showProject: true) }
           }
-        }.padding(.horizontal, 12).padding(.bottom, 12)
-      }
+        }.scrollTargetLayout().padding(.horizontal, 12).padding(.bottom, 12)
+      }.scrollPosition(id: $model.listScrollID)
     }
   }
 }

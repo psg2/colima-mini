@@ -1,10 +1,246 @@
 {
-  "vm": "{\"name\": \"default\", \"status\": \"Running\", \"cpus\": 10, \"memory\": 21474836480}",
-  "containers": "{\"ID\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"Names\": \"demo-web-1\", \"Image\": \"nginx:alpine\", \"State\": \"running\", \"Status\": \"Up 3 hours\", \"Ports\": \"0.0.0.0:8080->80/tcp, [::]:8080->80/tcp\", \"Labels\": \"com.docker.compose.project.working_dir=/tmp/demo,com.docker.compose.project=demo\"}\n{\"ID\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"Names\": \"demo-postgres-1\", \"Image\": \"postgres:17\", \"State\": \"running\", \"Status\": \"Up 3 hours (healthy)\", \"Ports\": \"127.0.0.1:5432->5432/tcp\", \"Labels\": \"com.docker.compose.project=demo\"}\n{\"ID\": \"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\", \"Names\": \"worker\", \"Image\": \"alpine:3.22\", \"State\": \"exited\", \"Status\": \"Exited (0) 2 days ago\", \"Ports\": \"\", \"Labels\": \"\"}",
+  "vm": "{\"name\": \"default\", \"status\": \"Running\", \"cpus\": 10, \"memory\": 21474836480, \"disk\": 107374182400}",
+  "containers": "{\"ID\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"Names\": \"demo-web-1\", \"Image\": \"nginx:alpine\", \"State\": \"running\", \"Status\": \"Up 3 hours\", \"Ports\": \"0.0.0.0:8080->80/tcp, [::]:8080->80/tcp\", \"Labels\": \"com.docker.compose.project.working_dir=/tmp/demo,com.docker.compose.project=demo,com.docker.compose.service=web\"}\n{\"ID\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"Names\": \"demo-postgres-1\", \"Image\": \"postgres:17\", \"State\": \"running\", \"Status\": \"Up 3 hours (healthy)\", \"Ports\": \"127.0.0.1:5432->5432/tcp\", \"Labels\": \"com.docker.compose.project=demo,com.docker.compose.service=postgres\"}\n{\"ID\": \"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\", \"Names\": \"worker\", \"Image\": \"alpine:3.22\", \"State\": \"exited\", \"Status\": \"Exited (137) 2 days ago\", \"Ports\": \"\", \"Labels\": \"\"}",
   "stats": "{\"ID\": \"aaaaaaaaaaaa\", \"CPUPerc\": \"1.25%\", \"MemUsage\": \"24MiB / 19.49GiB\", \"MemPerc\": \"0.12%\"}\n{\"ID\": \"bbbbbbbbbbbb\", \"CPUPerc\": \"0.30%\", \"MemUsage\": \"148MiB / 19.49GiB\", \"MemPerc\": \"0.74%\"}",
   "logs": {
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "2026-10-02T10:00:00Z GET /health 200\n2026-10-02T10:00:05Z GET / 200",
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "2026-10-02T10:00:00Z database system is ready to accept connections"
   },
-  "sweep": "recent   demo (2)           last log 5m ago\nstale    worker             not running for 2d\n\n1 stale group would be removed. This window is a report only."
+  "sweep": "recent   demo (2)           last log 5m ago\nstale    worker             not running for 2d\n\n1 stale group would be removed. This window is a report only.",
+  "details": {
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "name": "demo-web-1",
+      "image": "nginx:alpine",
+      "imageID": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "state": {
+        "status": "running",
+        "running": true,
+        "exitCode": 0,
+        "oomKilled": false,
+        "startedAt": "2026-10-02T10:00:00Z",
+        "finishedAt": null,
+        "error": "",
+        "health": null
+      },
+      "restartCount": 0,
+      "ports": [
+        {
+          "hostAddress": "0.0.0.0",
+          "hostPort": "8080",
+          "containerPort": "80",
+          "protocolName": "tcp"
+        }
+      ],
+      "mounts": [
+        {
+          "type": "bind",
+          "name": null,
+          "source": "/tmp/demo/public",
+          "destination": "/usr/share/nginx/html",
+          "readOnly": true
+        }
+      ],
+      "project": "demo",
+      "service": "web",
+      "mountsAvailable": true
+    },
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "name": "demo-postgres-1",
+      "image": "postgres:17",
+      "imageID": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "state": {
+        "status": "running",
+        "running": true,
+        "exitCode": 0,
+        "oomKilled": false,
+        "startedAt": "2026-10-02T10:00:00Z",
+        "finishedAt": null,
+        "error": "",
+        "health": "healthy"
+      },
+      "restartCount": 0,
+      "ports": [
+        {
+          "hostAddress": "127.0.0.1",
+          "hostPort": "5432",
+          "containerPort": "5432",
+          "protocolName": "tcp"
+        }
+      ],
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "demo_db",
+          "source": "/var/lib/docker/volumes/demo_db/_data",
+          "destination": "/var/lib/postgresql/data",
+          "readOnly": false
+        }
+      ],
+      "project": "demo",
+      "service": "postgres",
+      "mountsAvailable": true
+    },
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": {
+      "id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "name": "worker",
+      "image": "alpine:3.22",
+      "imageID": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "state": {
+        "status": "exited",
+        "running": false,
+        "exitCode": 137,
+        "oomKilled": true,
+        "startedAt": "2026-10-02T10:00:00Z",
+        "finishedAt": "2026-09-30T10:00:00Z",
+        "error": "",
+        "health": null
+      },
+      "restartCount": 0,
+      "ports": [],
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "demo_db",
+          "source": "/var/lib/docker/volumes/demo_db/_data",
+          "destination": "/backup/source",
+          "readOnly": true
+        }
+      ],
+      "project": null,
+      "service": null,
+      "mountsAvailable": true
+    }
+  },
+  "volumes": [
+    {
+      "name": "demo_db",
+      "driver": "local",
+      "project": "demo",
+      "mountpoint": "/var/lib/docker/volumes/demo_db/_data",
+      "createdAt": "2026-10-01T12:00:00Z",
+      "sizeBytes": 1900000000.0,
+      "references": [
+        {
+          "containerID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "containerName": "demo-postgres-1",
+          "destination": "/var/lib/postgresql/data",
+          "readOnly": false,
+          "running": true
+        },
+        {
+          "containerID": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "containerName": "worker",
+          "destination": "/backup/source",
+          "readOnly": true,
+          "running": false
+        }
+      ],
+      "referencesAvailable": true,
+      "dataIssue": null
+    },
+    {
+      "name": "archive_cache",
+      "driver": "local",
+      "project": null,
+      "mountpoint": "/var/lib/docker/volumes/archive_cache/_data",
+      "createdAt": "2026-09-20T12:00:00Z",
+      "sizeBytes": 128000000.0,
+      "references": [],
+      "referencesAvailable": true,
+      "dataIssue": null
+    },
+    {
+      "name": "external_data",
+      "driver": "plugin",
+      "project": null,
+      "mountpoint": null,
+      "createdAt": null,
+      "sizeBytes": null,
+      "references": [],
+      "referencesAvailable": false,
+      "dataIssue": "The plugin does not expose size or container references in this sample."
+    }
+  ],
+  "images": [
+    {
+      "imageID": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "repository": "nginx",
+      "tag": "alpine",
+      "sizeBytes": 25000000.0,
+      "sharedBytes": 0,
+      "uniqueBytes": 25000000.0,
+      "containerIDs": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "referencesAvailable": true
+    },
+    {
+      "imageID": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "repository": "postgres",
+      "tag": "17",
+      "sizeBytes": 430000000.0,
+      "sharedBytes": 10000000.0,
+      "uniqueBytes": 420000000.0,
+      "containerIDs": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "referencesAvailable": true
+    },
+    {
+      "imageID": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "repository": "alpine",
+      "tag": "3.22",
+      "sizeBytes": 8000000.0,
+      "sharedBytes": 0,
+      "uniqueBytes": 8000000.0,
+      "containerIDs": [
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ],
+      "referencesAvailable": true
+    }
+  ],
+  "storage": {
+    "measuredAt": 812628000.0,
+    "configuredCapacityBytes": 107374182400,
+    "filesystem": {
+      "sizeBytes": 103079215104,
+      "usedBytes": 12884901888,
+      "availableBytes": 84825604096,
+      "mountpoint": "/var/lib/docker"
+    },
+    "docker": [
+      {
+        "type": "Images",
+        "totalCount": 3,
+        "activeCount": 3,
+        "sizeBytes": 463000000.0,
+        "reclaimableBytes": 0
+      },
+      {
+        "type": "Containers",
+        "totalCount": 3,
+        "activeCount": 2,
+        "sizeBytes": 4200000.0,
+        "reclaimableBytes": 1200000.0
+      },
+      {
+        "type": "Local Volumes",
+        "totalCount": 3,
+        "activeCount": 1,
+        "sizeBytes": 2028000000.0,
+        "reclaimableBytes": 128000000.0
+      },
+      {
+        "type": "Build Cache",
+        "totalCount": 12,
+        "activeCount": 0,
+        "sizeBytes": 253000000.0,
+        "reclaimableBytes": 93010000.0
+      }
+    ],
+    "hostAllocatedBytes": 21474836480,
+    "errors": {}
+  }
 }

@@ -3,7 +3,9 @@ import Foundation
 // Files avoid pipe backpressure. Each command has private output files, a deadline,
 // and cancellation that terminates the child rather than leaving it running.
 package final class Command: @unchecked Sendable {
+  package enum OutputPolicy { case stdout, combined }
   private let lock = NSLock()
+  private let wake = DispatchSemaphore(value: 0)
   private var process: Process?
   private var cancelled = false
   package func cancel() {
@@ -11,11 +13,12 @@ package final class Command: @unchecked Sendable {
     cancelled = true
     let child = process
     lock.unlock()
+    wake.signal()
     if let child, child.isRunning { child.terminate() }
   }
   package func execute(
     _ executable: String, _ arguments: [String], timeout: Double,
-    environment: [String: String]
+    environment: [String: String], outputPolicy: OutputPolicy = .stdout
   ) throws -> String {
     guard FileManager.default.isExecutableFile(atPath: executable) else {
       throw AppError.message(
@@ -51,9 +54,12 @@ package final class Command: @unchecked Sendable {
     child.environment = env
     child.standardInput = FileHandle.nullDevice
     child.standardOutput = output
-    child.standardError = errors
+    child.standardError = outputPolicy == .combined ? output : errors
     let finished = DispatchSemaphore(value: 0)
-    child.terminationHandler = { _ in finished.signal() }
+    child.terminationHandler = { [wake] _ in
+      finished.signal()
+      wake.signal()
+    }
     lock.lock()
     if cancelled {
       lock.unlock()
@@ -67,8 +73,11 @@ package final class Command: @unchecked Sendable {
       lock.unlock()
       throw error
     }
-    let timedOut = finished.wait(timeout: .now() + timeout) == .timedOut
-    if timedOut {
+    let timedOut = wake.wait(timeout: .now() + timeout) == .timedOut
+    lock.lock()
+    let wasCancelled = cancelled
+    lock.unlock()
+    if timedOut || wasCancelled {
       if child.isRunning { child.terminate() }
       if finished.wait(timeout: .now() + 2) == .timedOut && child.isRunning {
         kill(child.processIdentifier, SIGKILL)
@@ -76,10 +85,10 @@ package final class Command: @unchecked Sendable {
       }
     }
     lock.lock()
-    let wasCancelled = cancelled
+    let cancellationReceived = cancelled
     process = nil
     lock.unlock()
-    if wasCancelled { throw CancellationError() }
+    if cancellationReceived { throw CancellationError() }
     if timedOut {
       throw AppError.message(
         "\(URL(fileURLWithPath: executable).lastPathComponent) timed out after \(Int(timeout)) seconds. Try Refresh."
@@ -98,20 +107,23 @@ package final class Command: @unchecked Sendable {
     let errorText = try read(stderrURL)
     guard child.terminationStatus == 0 else {
       throw AppError.message(
-        errorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-          ? "Command failed with exit code \(child.terminationStatus)." : errorText)
+        (outputPolicy == .combined ? text : errorText)
+          .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          ? "Command failed with exit code \(child.terminationStatus)."
+          : (outputPolicy == .combined ? text : errorText))
     }
     return text
-      + (arguments.first == "--context" && arguments.dropFirst(2).first == "logs" ? errorText : "")
   }
   package static func run(
     _ executable: String, _ arguments: [String], timeout: Double = 15,
-    environment: [String: String] = [:]
+    environment: [String: String] = [:], outputPolicy: OutputPolicy = .stdout
   ) async throws -> String {
     let command = Command()
     return try await withTaskCancellationHandler {
       try await Task.detached(priority: .utility) {
-        try command.execute(executable, arguments, timeout: timeout, environment: environment)
+        try command.execute(
+          executable, arguments, timeout: timeout, environment: environment,
+          outputPolicy: outputPolicy)
       }.value
     } onCancel: {
       command.cancel()

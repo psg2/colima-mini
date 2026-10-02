@@ -38,8 +38,25 @@ LSOF = os.environ.get("DOCKER_SWEEP_LSOF", "lsof")
 DOCKER_PROCESSES = ("com.docke", "vpnkit", "docker")
 
 
-def run(*args, stderr=subprocess.DEVNULL):
-    return subprocess.run(args, stdout=subprocess.PIPE, stderr=stderr, text=True).stdout.strip()
+class ScanError(Exception):
+    pass
+
+
+def run(*args, stderr=subprocess.PIPE, allow_no_matches=False):
+    try:
+        result = subprocess.run(args, stdout=subprocess.PIPE, stderr=stderr, text=True)
+    except OSError as error:
+        raise ScanError(f"Cannot run {os.path.basename(args[0])}: {error.strerror}") from error
+    if result.returncode != 0:
+        # lsof uses status 1 for a successful query with no matching connections.
+        if allow_no_matches and result.returncode == 1 and not result.stdout and not result.stderr:
+            return ""
+        diagnostic = (result.stderr or "").strip()
+        raise ScanError(
+            f"{os.path.basename(args[0])} {args[1] if len(args) > 1 else ''} failed "
+            f"(exit {result.returncode})" + (f": {diagnostic}" if diagnostic else ".")
+        )
+    return result.stdout.strip()
 
 
 def parse_duration(text):
@@ -72,7 +89,7 @@ def net_io():
 def host_clients():
     """Map published host port -> processes connected to it from the host."""
     clients = {}
-    for line in run(LSOF, "-nP", "-iTCP", "-sTCP:ESTABLISHED").splitlines()[1:]:
+    for line in run(LSOF, "-nP", "-iTCP", "-sTCP:ESTABLISHED", allow_no_matches=True).splitlines()[1:]:
         fields = line.split()
         if len(fields) < 9 or fields[0].startswith(DOCKER_PROCESSES) or "->" not in line:
             continue
@@ -196,4 +213,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (ScanError, ValueError, KeyError, TypeError) as error:
+        print(f"Scan failed: {error}", file=sys.stderr)
+        sys.exit(1)

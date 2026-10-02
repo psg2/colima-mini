@@ -1,4 +1,5 @@
 import AppKit
+import ColimaAppState
 import ColimaCore
 import Combine
 import Foundation
@@ -10,7 +11,7 @@ struct ContainerRow: View {
   let showProject: Bool
   var body: some View {
     Button {
-      model.selectedID = container.id
+      model.openContainer(container.id)
     } label: {
       HStack(spacing: 12) {
         Image(systemName: container.needsAttention ? "exclamationmark.triangle" : "shippingbox")

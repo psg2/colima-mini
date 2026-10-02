@@ -1,4 +1,5 @@
 import AppKit
+import ColimaAppState
 import ColimaCore
 import Combine
 import Foundation
@@ -10,9 +11,9 @@ struct MenuView: View {
   @Environment(\.openSettings) private var openSettings
   private func showDashboard(project: String? = nil) {
     if let project {
-      model.project = project
-      model.search = ""
+      model.navigate(.containers, project: project)
     }
+    if project == nil { model.navigate(.containers, project: "All containers") }
     openWindow(id: "dashboard")
     NSApp.activate(ignoringOtherApps: true)
   }

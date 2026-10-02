@@ -7,7 +7,9 @@ let package = Package(
   products: [.executable(name: "ColimaMini", targets: ["ColimaMini"])],
   targets: [
     .target(name: "ColimaCore", resources: [.copy("Resources/docker-sweep.py")]),
-    .executableTarget(name: "ColimaMini", dependencies: ["ColimaCore"]),
+    .target(name: "ColimaAppState", dependencies: ["ColimaCore"]),
+    .executableTarget(name: "ColimaMini", dependencies: ["ColimaCore", "ColimaAppState"]),
+    .testTarget(name: "ColimaAppStateTests", dependencies: ["ColimaAppState", "ColimaCore"]),
     .testTarget(
       name: "ColimaCoreTests", dependencies: ["ColimaCore"], resources: [.copy("Fixtures")]),
   ],
