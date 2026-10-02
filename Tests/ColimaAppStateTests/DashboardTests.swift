@@ -238,6 +238,24 @@ private actor ResultGate<Value> {
     XCTAssertEqual(received.map(\.containerID), ["abc123"])
     XCTAssertEqual(model.containers.last?.running, false)
   }
+  func testProjectLogsReturnToTheProjectWithoutAnotherPagesBuffer() async throws {
+    let model = Dashboard(backend: backend())
+    model.navigate(.containers, project: "demo")
+    model.openContainer("abc123")
+    model.logs = "postgres output"
+    model.goBack()
+    model.openProjectLogs("demo")
+    XCTAssertEqual(model.route, .projectLogs("demo"))
+    XCTAssertTrue(model.logs.isEmpty)
+    model.openContainer("abc123")
+    model.logs = "single container output"
+    model.goBack()
+    XCTAssertEqual(model.route, .projectLogs("demo"))
+    XCTAssertTrue(model.logs.isEmpty)
+    model.goBack()
+    XCTAssertEqual(model.route, .containers)
+    XCTAssertEqual(model.project, "demo")
+  }
   func testReopeningTheSameContainerKeepsOneBackStep() async throws {
     let model = Dashboard(backend: backend())
     model.navigate(.volumes)

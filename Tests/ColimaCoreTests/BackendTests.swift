@@ -58,6 +58,11 @@ final class BackendTests: XCTestCase {
                   if row['ID'] in args[1:] and row['ID'] != data.get('fail_restore'):
                       row['State'], row['Status'] = 'running', 'Up just now'
           elif args[0] == 'logs':
+              if args[-1] == 'split':
+                  sys.stdout.write('2026-10-02T12:00:02Z hel'); sys.stdout.flush()
+                  time.sleep(0.2)
+                  print('lo from split', flush=True)
+                  sys.exit(0)
               if args[-1] == 'endless':
                   path.with_name('follower.pid').write_text(str(os.getpid()))
                   print('2026-10-02T12:00:00Z first line', flush=True)
@@ -130,6 +135,21 @@ final class BackendTests: XCTestCase {
         logs,
         "2026-10-02T12:00:00Z stdout log\n2026-10-02T12:00:01Z stderr log\n2026-10-02T12:00:01Z equal timestamp\nmultiline body\n"
       )
+    }
+  }
+  func testProjectLogsLabelWholeLinesFromEverySource() async throws {
+    try await runtime { backend, _ in
+      var text = ""
+      for try await chunk in backend.followProjectLogs([
+        LogSource(id: "sample", label: "db"), LogSource(id: "split", label: "web"),
+      ]) { text += chunk }
+      let lines = text.split(separator: "\n").map(String.init)
+      XCTAssertTrue(lines.contains("2026-10-02T12:00:02Z [web] hello from split"))
+      XCTAssertTrue(lines.contains("2026-10-02T12:00:00Z [db] stdout log"))
+      XCTAssertTrue(lines.contains("2026-10-02T12:00:01Z [db] stderr log"))
+      // A continuation line without a timestamp still names its source.
+      XCTAssertTrue(lines.contains("[db] multiline body"))
+      XCTAssertEqual(lines.count, 5)
     }
   }
   func testStoppingAFollowTerminatesTheLogProcess() async throws {

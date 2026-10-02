@@ -7,21 +7,9 @@ import SwiftUI
 struct ContainerDetailView: View {
   @ObservedObject var model: Dashboard
   let id: String
-  @State private var logSearch = ""
-  @State private var follow = true
-  @State private var timestamps = true
   @Environment(\.scenePhase) private var scenePhase
   var currentDetails: ContainerDetails? { model.details?.id == id ? model.details : nil }
   var container: Container? { model.containers.first { $0.id == id } }
-  var filteredLogs: String {
-    model.logs.components(separatedBy: .newlines).filter {
-      logSearch.isEmpty || $0.localizedCaseInsensitiveContains(logSearch)
-    }.map { line in
-      guard !timestamps, let space = line.firstIndex(of: " "), line.prefix(4).allSatisfy(\.isNumber)
-      else { return line }
-      return String(line[line.index(after: space)...])
-    }.joined(separator: "\n")
-  }
   var tab: ContainerPageTab { model.containerTab }
   var polling: Bool { tab == .logs && !model.logsPaused && scenePhase == .active }
   var body: some View {
@@ -74,7 +62,6 @@ struct ContainerDetailView: View {
         guard polling else { return }
         await model.followLogs(id)
       }
-      .onChange(of: logSearch) { _, search in if !search.isEmpty { follow = false } }
   }
   private func header(_ c: Container) -> some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -204,53 +191,9 @@ struct ContainerDetailView: View {
     }
   }
   private var logsView: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack {
-        TextField("Find in logs", text: $logSearch).textFieldStyle(.roundedBorder)
-        Button(model.logsPaused ? "Resume" : "Pause") { model.logsPaused.toggle() }
-          .accessibilityIdentifier("logs.pause")
-        Toggle(
-          "Follow latest", isOn: Binding(get: { follow && logSearch.isEmpty }, set: { follow = $0 })
-        ).toggleStyle(.checkbox).disabled(!logSearch.isEmpty).help(
-          "Searching pauses automatic following.")
-        Toggle("Timestamps", isOn: $timestamps).toggleStyle(.checkbox)
-        Button("Copy visible logs") {
-          NSPasteboard.general.clearContents()
-          NSPasteboard.general.setString(filteredLogs, forType: .string)
-        }
-      }
-      HStack {
-        if model.logsLive && !model.logsPaused {
-          Label("Live", systemImage: "dot.radiowaves.left.and.right").foregroundStyle(.green)
-        } else {
-          Text(
-            model.logsPaused
-              ? "Paused"
-              : scenePhase != .active
-                ? "Paused while inactive"
-                : container?.running == false ? "Container stopped" : "Connecting…")
-        }
-        Text("· Up to \(Dashboard.logLineLimit) lines, starting with the last 500")
-        if model.logsLoading { ProgressView().controlSize(.small) }
-        Spacer()
-        if let date = model.logsDate {
-          Text("Last output " + date.formatted(date: .omitted, time: .standard))
-        }
-      }.font(.caption).foregroundStyle(.secondary)
-      if let error = model.logError { StatusMessage(text: "Logs stopped following. " + error) }
-      LogConsole(text: filteredLogs, follow: follow && logSearch.isEmpty)
-        .overlay {
-          if model.logs.isEmpty && !model.logsLoading {
-            Text(
-              model.logError == nil
-                ? "This container has not written any logs." : "No log buffer available."
-            )
-            .foregroundStyle(.secondary)
-          } else if filteredLogs.isEmpty && !logSearch.isEmpty {
-            Text("No matching log lines.").foregroundStyle(.secondary)
-          }
-        }
-    }
+    LogPanel(
+      model: model, running: container?.running,
+      emptyMessage: "This container has not written any logs.")
   }
   private var portsView: some View {
     ScrollView {

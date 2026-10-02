@@ -175,6 +175,13 @@ struct MenuView: View {
         }.buttonStyle(.plain).help(origin?.displayPath ?? "running/total containers")
         Menu {
           Button("Open in dashboard") { show(project: project) }
+          if containers.contains(where: \.running) {
+            Button("Show logs") {
+              model.navigate(.containers, project: project)
+              model.openProjectLogs(project)
+              showDashboard()
+            }
+          }
           ProjectActions.items(model: model, containers: containers)
           if let origin {
             Divider()

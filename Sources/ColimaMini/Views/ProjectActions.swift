@@ -10,6 +10,10 @@ struct ProjectActions: View {
   let containers: [Container]
   var body: some View {
     Menu {
+      if let project = containers.first?.project, containers.contains(where: \.running) {
+        Button("Show logs") { model.openProjectLogs(project) }
+        Divider()
+      }
       Self.items(model: model, containers: containers)
       if let origin = containers.lazy.compactMap(\.origin).first {
         Divider()

@@ -4,6 +4,7 @@ package enum AppRoute: Hashable {
   case overview
   case containers
   case container(String)
+  case projectLogs(String)
   case volumes
   case volume(String)
   case images
@@ -24,7 +25,7 @@ package enum AppRoute: Hashable {
   }
   package var section: AppRoute {
     switch self {
-    case .container: return .containers
+    case .container, .projectLogs: return .containers
     case .volume: return .volumes
     case .image: return .images
     default: return self

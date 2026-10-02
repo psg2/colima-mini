@@ -208,6 +208,7 @@ package struct PendingAction: Identifiable {
       resetLogs()
     } else {
       selectedID = nil
+      if case .projectLogs = route { resetLogs() }
     }
     logGeneration += 1
     logsLoading = false
@@ -298,7 +299,25 @@ package struct PendingAction: Identifiable {
   // the container stops. The buffer is replaced only when the new stream
   // produces output, so a failed start keeps the previous lines visible.
   package func followLogs(_ id: String) async {
-    guard route == .container(id), !logsPaused else { return }
+    await follow(.container(id), streamLogs(id))
+  }
+  // Every running service of a project in one stream, labeled per service.
+  package func followProjectLogs(_ project: String) async {
+    let sources = containers.filter { $0.project == project && $0.running }.map {
+      LogSource(id: $0.id, label: $0.service)
+    }
+    guard !sources.isEmpty else { return }
+    await follow(.projectLogs(project), backend.followProjectLogs(sources))
+  }
+  package func openProjectLogs(_ project: String) {
+    if route != .projectLogs(project) { backRoutes.append(route) }
+    route = .projectLogs(project)
+    selectedID = nil
+    resetLogs()
+  }
+  private func follow(_ target: AppRoute, _ stream: AsyncThrowingStream<String, Error>) async {
+    let id = target
+    guard route == id, !logsPaused else { return }
     logGeneration += 1
     let generation = logGeneration
     var current: String?
@@ -310,10 +329,10 @@ package struct PendingAction: Identifiable {
       }
     }
     func valid() -> Bool {
-      generation == logGeneration && route == .container(id) && !Task.isCancelled && !logsPaused
+      generation == logGeneration && route == id && !Task.isCancelled && !logsPaused
     }
     do {
-      for try await chunk in streamLogs(id) {
+      for try await chunk in stream {
         guard valid() else { return }
         let text = (current ?? "") + chunk
         // Keep the newest lines so a chatty container can't grow memory unbounded.
@@ -328,7 +347,7 @@ package struct PendingAction: Identifiable {
         logsLive = true
       }
     } catch is CancellationError {} catch {
-      guard generation == logGeneration, route == .container(id), !Task.isCancelled else { return }
+      guard generation == logGeneration, route == id, !Task.isCancelled else { return }
       logError = error.localizedDescription
     }
   }
