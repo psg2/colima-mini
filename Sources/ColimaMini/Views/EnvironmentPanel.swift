@@ -19,7 +19,7 @@ struct EnvironmentPanel: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack {
-        TextField("Filter variables", text: $search).textFieldStyle(.roundedBorder)
+        TextField("Filter variables", text: $search).findable(model).textFieldStyle(.roundedBorder)
           .frame(maxWidth: 320)
         Spacer()
         if let variables {

@@ -98,6 +98,9 @@ package struct PendingAction: Identifiable {
   @Published package var cleanupResult: CleanupResult?
   @Published package var reclaiming = false
   @Published package var showingReclaim = false
+  @Published package var showingPalette = false
+  // Bumped by Find (⌘F); the visible filter field takes focus.
+  @Published package var findRequest = 0
   @Published package var history: [String: [MetricSample]] = [:]
   @Published package var totalHistory: [MetricSample] = []
   @Published package var notificationsEnabled = true
@@ -142,6 +145,17 @@ package struct PendingAction: Identifiable {
   package var sample: Bool { backend.fixture != nil }
   package var containers: [Container] { snapshot?.containers ?? [] }
   package var selected: Container? { containers.first { $0.id == selectedID } }
+  package var canGoBack: Bool {
+    switch route {
+    case .container, .projectLogs, .volume, .image: return true
+    default: return false
+    }
+  }
+  // The container whose page is open, for menu commands.
+  package var openContainer: Container? {
+    if case .container(let id) = route { return containers.first { $0.id == id } }
+    return nil
+  }
   package var visible: [Container] {
     containers.filter {
       (project == "All containers" || $0.project == project) && (!onlyRunning || $0.running)

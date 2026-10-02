@@ -5,7 +5,6 @@ import SwiftUI
 
 struct DashboardView: View {
   @ObservedObject var model: Dashboard
-  @State private var palette = false
   var body: some View {
     NavigationSplitView {
       SidebarView(model: model)
@@ -30,11 +29,11 @@ struct DashboardView: View {
           }
           Spacer()
           Button {
-            palette = true
+            model.showingPalette = true
           } label: {
             Label("Search", systemImage: "magnifyingglass")
           }
-          .buttonStyle(.plain).keyboardShortcut("k", modifiers: .command)
+          .buttonStyle(.plain)
           .accessibilityIdentifier("dashboard.search")
           Text("⌘K").foregroundStyle(.tertiary)
           if let date = model.lastRefresh {
@@ -46,7 +45,9 @@ struct DashboardView: View {
     .navigationSplitViewColumnWidth(min: 210, ideal: 235, max: 300)
     .onChange(of: model.grouped) { _, _ in model.savePreferences() }
     .onChange(of: model.onlyRunning) { _, _ in model.savePreferences() }
-    .sheet(isPresented: $palette) { CommandPalette(model: model, presented: $palette) }
+    .sheet(isPresented: $model.showingPalette) {
+      CommandPalette(model: model, presented: $model.showingPalette)
+    }
     .confirmationDialog(
       model.pending?.title ?? "Confirm action",
       isPresented: Binding(
@@ -142,8 +143,9 @@ struct ContainersView: View {
             )
             .accessibilityIdentifier("groups.toggle")
         }
-        TextField("Filter containers or projects", text: $model.search).textFieldStyle(
-          .roundedBorder)
+        TextField("Filter containers or projects", text: $model.search).findable(model)
+          .textFieldStyle(
+            .roundedBorder)
         Toggle("Running only", isOn: $model.onlyRunning).toggleStyle(.checkbox)
       }.padding(.horizontal, 20).padding(.bottom, 12)
       if !model.search.isEmpty && model.grouped {

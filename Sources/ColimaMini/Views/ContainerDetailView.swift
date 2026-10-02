@@ -20,7 +20,7 @@ struct ContainerDetailView: View {
         Label("Back", systemImage: "chevron.left")
       }
       .buttonStyle(.plain).foregroundStyle(.secondary).padding(.bottom, 18)
-      .keyboardShortcut("[", modifiers: .command).accessibilityIdentifier("container.back")
+      .accessibilityIdentifier("container.back")
       if let container {
         header(container)
         Picker("Container details", selection: $model.containerTab) {

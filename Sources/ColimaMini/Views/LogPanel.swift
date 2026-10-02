@@ -28,7 +28,7 @@ struct LogPanel: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack {
-        TextField("Find in logs", text: $search).textFieldStyle(.roundedBorder)
+        TextField("Find in logs", text: $search).findable(model).textFieldStyle(.roundedBorder)
         if !services.isEmpty {
           Menu("Services") {
             ForEach(services, id: \.self) { service in
@@ -99,7 +99,7 @@ struct ProjectLogsView: View {
         Label("Back", systemImage: "chevron.left")
       }
       .buttonStyle(.plain).foregroundStyle(.secondary)
-      .keyboardShortcut("[", modifiers: .command).accessibilityIdentifier("projectLogs.back")
+      .accessibilityIdentifier("projectLogs.back")
       VStack(alignment: .leading, spacing: 5) {
         Text(project).font(.system(.title, design: .rounded).weight(.semibold))
         Text(
