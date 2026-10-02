@@ -69,6 +69,8 @@ final class BackendTests: XCTestCase {
       try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
     }
     var environment = ProcessInfo.processInfo.environment
+    environment["COLIMA_MINI_DOCKER"] = directory.appendingPathComponent("docker").path
+    environment["COLIMA_MINI_COLIMA"] = directory.appendingPathComponent("colima").path
     environment["PATH"] = directory.path + ":" + (environment["PATH"] ?? "")
     environment["DOCKER_HOST"] = "unix:///nonexistent/foreign.sock"
     environment["DOCKER_CONTEXT"] = "foreign"
