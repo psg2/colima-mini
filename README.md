@@ -67,7 +67,7 @@ Confirm that the dashboard opens and reports the default Colima profile.
 ## Use
 
 Use the sidebar to open Overview, Containers, a Compose project, Volumes, Images,
-Storage or Settings. The app reopens the last page you used. Press **Command+K** to
+Networks, Storage or Settings. The app reopens the last page you used. Press **Command+K** to
 search loaded objects and pages. Type an action such as `restart`, `shell` or `logs`
 to act on a container. Use the arrow keys to choose a result and Return to open it.
 Settings stays aligned at the bottom and is also available with **Command+,**.
@@ -78,7 +78,7 @@ The **Go** and **Container** menus list every shortcut.
 
 | Keys | Action |
 | --- | --- |
-| ⌘1 … ⌘5 | Overview, Containers, Volumes, Images, Storage |
+| ⌘1 … ⌘6 | Overview, Containers, Volumes, Images, Networks, Storage |
 | ⌘K | Search and actions |
 | ⌘F | Focus the filter or log search on the current page |
 | ⌘[ | Back |
@@ -134,6 +134,9 @@ The **Go** and **Container** menus list every shortcut.
   an HTTP service, so database ports don't get an inferred browser URL.
 - Inspect named and anonymous volumes and their container mount destinations. References include
   stopped containers; an unattached volume isn't automatically safe to delete.
+- Open **Networks** to see each network's driver, subnet, Compose project and the
+  running containers on it, with their addresses. **Remove…** deletes an unused
+  custom network without force; Docker refuses one a stopped container still uses.
 - Open Storage for disk measurements, **Reclaim space** and **Review unused
   containers**. The scan groups containers by project, explains each verdict
   (deleted worktree, stopped for over a day, idle, in use) and offers **Stop**

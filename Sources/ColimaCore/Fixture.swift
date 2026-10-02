@@ -8,6 +8,7 @@ package struct Fixture: Decodable {
   package let sweep: String?
   package var sweepGroups: [SweepGroup]? = nil
   package var environment: [String: [String]]? = nil
+  package var networks: [DockerNetwork]? = nil
   package var details: [String: ContainerDetails]? = nil
   package var volumes: [Volume]? = nil
   package var images: [DockerImage]? = nil

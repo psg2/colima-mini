@@ -19,7 +19,7 @@ struct CommandPalette: View {
   private var results: [PaletteResult] {
     var values = [
       ("Overview", AppRoute.overview), ("Containers", .containers), ("Volumes", .volumes),
-      ("Images", .images),
+      ("Images", .images), ("Networks", .networks),
       ("Storage", .storage), ("Settings", .settings),
     ].map {
       PaletteResult(

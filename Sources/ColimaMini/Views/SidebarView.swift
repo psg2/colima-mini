@@ -54,6 +54,8 @@ struct SidebarView: View {
           "Containers", symbol: "shippingbox", route: .containers, count: model.containers.count)
         navigationRow("Volumes", symbol: "externaldrive", route: .volumes)
         navigationRow("Images", symbol: "square.3.layers.3d", route: .images)
+        navigationRow(
+          "Networks", symbol: "point.3.connected.trianglepath.dotted", route: .networks)
         navigationRow("Storage", symbol: "chart.pie", route: .storage)
         Section("Projects") {
           ForEach(model.snapshot?.projects ?? [], id: \.self) { project in
