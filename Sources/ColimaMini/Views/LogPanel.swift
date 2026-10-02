@@ -13,6 +13,7 @@ struct LogPanel: View {
   @State private var follow = true
   @State private var timestamps = true
   @State private var hidden: Set<String> = []
+  @AppStorage("logWrap") private var wrap = false
   @Environment(\.scenePhase) private var scenePhase
   var visible: String {
     model.logs.components(separatedBy: .newlines).filter { line in
@@ -46,6 +47,8 @@ struct LogPanel: View {
         ).toggleStyle(.checkbox).disabled(!search.isEmpty).help(
           "Searching pauses automatic following.")
         Toggle("Timestamps", isOn: $timestamps).toggleStyle(.checkbox)
+        Toggle("Wrap lines", isOn: $wrap).toggleStyle(.checkbox)
+          .accessibilityIdentifier("logs.wrap")
         Button("Copy visible logs") { Launcher.copy(visible) }
       }
       HStack {
@@ -67,7 +70,7 @@ struct LogPanel: View {
         }
       }.font(.caption).foregroundStyle(.secondary)
       if let error = model.logError { StatusMessage(text: "Logs stopped following. " + error) }
-      LogConsole(text: visible, follow: follow && search.isEmpty)
+      LogConsole(text: visible, follow: follow && search.isEmpty, wrap: wrap)
         .overlay {
           if model.logs.isEmpty && !model.logsLoading {
             Text(model.logError == nil ? emptyMessage : "No log buffer available.")

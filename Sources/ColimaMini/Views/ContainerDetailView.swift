@@ -306,18 +306,25 @@ struct ContainerDetailView: View {
 struct LogConsole: View {
   let text: String
   let follow: Bool
+  var wrap = false
   var body: some View {
     ScrollViewReader { proxy in
-      ScrollView([.horizontal, .vertical]) {
+      ScrollView(wrap ? [.vertical] : [.horizontal, .vertical]) {
         VStack(alignment: .leading, spacing: 0) {
           Text(text).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
-            .fixedSize(horizontal: true, vertical: false).frame(
-              maxWidth: .infinity, alignment: .leading)
-          Color.clear.frame(height: 1).id("tail")
-        }.padding(12)
-      }.background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
-        .onChange(of: text) { _, _ in if follow { proxy.scrollTo("tail", anchor: .bottom) } }
-        .onChange(of: follow) { _, value in if value { proxy.scrollTo("tail", anchor: .bottom) } }
+            .fixedSize(horizontal: !wrap, vertical: true)
+            .frame(maxWidth: wrap ? .infinity : nil, alignment: .leading)
+          Color.clear.frame(width: 1, height: 1).id("tail")
+        }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+      }.defaultScrollAnchor(.bottomLeading)
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+        // Leading, not centered: long lines would otherwise scroll the view to
+        // their middle and hide the start of every line.
+        .onChange(of: text) { _, _ in if follow { proxy.scrollTo("tail", anchor: .bottomLeading) } }
+        .onChange(of: follow) { _, value in
+          if value { proxy.scrollTo("tail", anchor: .bottomLeading) }
+        }
+        .onChange(of: wrap) { _, _ in if follow { proxy.scrollTo("tail", anchor: .bottomLeading) } }
         .accessibilityLabel("Container logs")
     }
   }
