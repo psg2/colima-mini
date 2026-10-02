@@ -7,6 +7,10 @@
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "2026-10-02T10:00:00Z database system is ready to accept connections"
   },
   "sweep": "recent   demo (2)           last log 5m ago\nstale    worker             not running for 2d\n\n1 stale group would be removed. This window is a report only.",
+  "sweepGroups": [
+    {"verdict": "stale", "name": "worker", "project": null, "reason": "not running for 2d", "containers": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]},
+    {"verdict": "recent", "name": "demo", "project": "demo", "reason": "no clients, no traffic, last log 5m ago", "containers": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]}
+  ],
   "details": {
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
       "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

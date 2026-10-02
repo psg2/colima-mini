@@ -22,6 +22,7 @@ Usage:
   docker-sweep --apply          remove orphan and stale groups, stop idle ones
   docker-sweep --idle-for 3d    idle threshold (m, h or d; default 24h)
   docker-sweep --sample 10      traffic sample window in seconds (default 30, 0 skips)
+  docker-sweep --json           report as JSON: verdict, name, project, reason, containers
 """
 
 import argparse
@@ -149,11 +150,14 @@ def main():
     parser.add_argument("--apply", action="store_true", help="remove orphan and stale groups, stop idle ones")
     parser.add_argument("--idle-for", type=parse_duration, default=parse_duration("24h"))
     parser.add_argument("--sample", type=int, default=30)
+    parser.add_argument("--json", action="store_true", help="print the report as JSON")
     args = parser.parse_args()
+    if args.json and args.apply:
+        parser.error("--json reports only; it cannot be combined with --apply")
 
     ids = run(DOCKER, "ps", "-aq").split()
     if not ids:
-        print("No containers.")
+        print("[]" if args.json else "No containers.")
         return
     containers = json.loads(run(DOCKER, "inspect", *ids))
 
@@ -182,6 +186,13 @@ def main():
 
     order = ["orphan", "stale", "idle", "recent", "active", "stopped"]
     verdicts.sort(key=lambda v: (order.index(v[0]), v[1]["name"]))
+    if args.json:
+        print(json.dumps([
+            {"verdict": verdict, "name": group["name"], "project": group["project"],
+             "reason": reason, "containers": [c["Id"] for c in group["containers"]]}
+            for verdict, group, reason in verdicts
+        ]))
+        return
     for verdict, group, reason in verdicts:
         count = len(group["containers"])
         name = group["name"] + (f" ({count})" if count > 1 else "")

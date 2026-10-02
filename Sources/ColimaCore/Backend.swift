@@ -127,6 +127,19 @@ package struct Backend {
   }
   package func sweep() async throws -> String {
     if let fixture { return fixture.sweep ?? "Nothing to clean up." }
+    return try await runScanner([])
+  }
+  // The same scan as `sweep()`, structured. It never changes containers.
+  package func unusedContainers() async throws -> [SweepGroup] {
+    if let fixture { return fixture.sweepGroups ?? [] }
+    let output = try await runScanner(["--json"])
+    do {
+      return try JSONDecoder().decode([SweepGroup].self, from: Data(output.utf8))
+    } catch {
+      throw AppError.message("The cleanup scanner returned an unreadable report.")
+    }
+  }
+  private func runScanner(_ arguments: [String]) async throws -> String {
     let bundle: Bundle
     if Bundle.main.bundleURL.pathExtension == "app" {
       guard
@@ -147,7 +160,7 @@ package struct Backend {
     environment["DOCKER_CONTEXT"] = "colima"
     environment["DOCKER_SWEEP_DOCKER"] = try toolchain.executable("docker")
     return try await Command.run(
-      toolchain.executable("python3"), [script.path, "--sample", "2"], timeout: 45,
+      toolchain.executable("python3"), [script.path, "--sample", "2"] + arguments, timeout: 45,
       environment: environment)
   }
 }
