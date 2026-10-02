@@ -92,6 +92,7 @@ struct VolumeDetailView: View {
   @ObservedObject var model: Dashboard
   let name: String
   var volume: Volume? { model.volumes.first { $0.name == name } }
+  @State private var confirmingRemoval = false
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
       BackButton(model: model, identifier: "volume.back")
@@ -104,7 +105,26 @@ struct VolumeDetailView: View {
           }
         }
         Spacer()
+        Button("Remove…") { confirmingRemoval = true }
+          .disabled(volume?.attached != false || model.busy || model.sample)
+          .help(
+            volume?.attached == false
+              ? "Delete this volume and its data" : "Only unattached volumes can be removed"
+          )
+          .accessibilityIdentifier("volume.remove")
         RefreshButton(busy: model.volumesLoading) { await model.loadVolumes() }
+      }
+      .confirmationDialog(
+        "Delete \(name)?", isPresented: $confirmingRemoval, titleVisibility: .visible
+      ) {
+        Button("Delete volume and data", role: .destructive) {
+          Task { if await model.removeVolume(name) { model.goBack() } }
+        }
+      } message: {
+        Text(
+          "Deletes \(bytesText(volume?.sizeBytes)) of data inside Colima"
+            + (volume?.project.map { ", used by the \($0) project" } ?? "")
+            + ". This can't be undone. Docker refuses if a container still references it.")
       }
       if let error = model.volumesError { StatusMessage(text: error) }
       if model.volumesLoading { ProgressView().controlSize(.small) }
@@ -172,8 +192,10 @@ struct VolumeDetailView: View {
             }
           }
         }
-        Text("Data is inside the Colima VM. This page does not delete or edit volume contents.")
-          .font(.caption).foregroundStyle(.secondary)
+        Text(
+          "Data is inside the Colima VM. Only an unattached volume can be removed, after confirmation."
+        )
+        .font(.caption).foregroundStyle(.secondary)
       } else if !model.volumesLoading {
         EmptyPage(
           title: "Volume unavailable",

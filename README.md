@@ -141,7 +141,9 @@ The **Go** and **Container** menus list every shortcut.
 - Inspect published port bindings and copy their addresses. TCP doesn't identify
   an HTTP service, so database ports don't get an inferred browser URL.
 - Inspect named and anonymous volumes and their container mount destinations. References include
-  stopped containers; an unattached volume isn't automatically safe to delete.
+  stopped containers; an unattached volume isn't automatically safe to delete. The list
+  starts with named volumes and remembers the Kind you pick. An unattached volume's page
+  offers **Remove…**, which deletes it and its data after confirmation.
 - Open **Networks** to see each network's driver, subnet, Compose project and the
   running containers on it, with their addresses. **Remove…** deletes an unused
   custom network without force; Docker refuses one a stopped container still uses.
@@ -191,9 +193,12 @@ bytes don't promise an equal reduction in the Mac disk footprint. Volume metadat
 uses Linux mount paths; these aren't folders you can open in Finder.
 
 Storage refreshes separately from the container list. A storage read failure
-doesn't prevent container navigation or controls. Apart from Reclaim space, the
-app doesn't remove Docker objects. It never removes named volumes, resizes VM
-disks or compacts disk images.
+doesn't prevent container navigation or controls. Docker objects are removed
+only by actions you confirm: Reclaim space, container, image, network and
+volume removal, and Compose down. Reclaim space never removes named volumes;
+a named volume goes only through **Remove…** on its unattached volume page or
+**Down and delete volumes…**. The app never compacts disk images, and the disk
+only grows through Settings.
 
 ### Reclaim space
 
