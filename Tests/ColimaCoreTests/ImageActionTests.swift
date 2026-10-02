@@ -39,7 +39,7 @@ final class ImageActionTests: XCTestCase {
     } catch {}
 
     XCTAssertEqual(
-      try String(contentsOf: record, encoding: .utf8).split(separator: "\n"),
+      try String(contentsOf: record, encoding: .utf8).split(separator: "\n").map(String.init),
       [
         "image rm postgres:17", "image rm sha256:" + String(repeating: "a", count: 64),
         "pull --quiet postgres:18",
