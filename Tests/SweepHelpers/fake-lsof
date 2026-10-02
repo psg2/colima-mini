@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Stand-in for `lsof`: a node process connected to host port 55001, plus the
+# Docker Desktop side of the same connection, which docker-sweep must ignore.
+cat <<'OUT'
+COMMAND     PID   USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+node      31993 demo   21u  IPv4 0x1111      0t0  TCP 127.0.0.1:61234->127.0.0.1:55001 (ESTABLISHED)
+com.docke   900 demo   80u  IPv4 0x2222      0t0  TCP 127.0.0.1:55002->127.0.0.1:61235 (ESTABLISHED)
+OUT

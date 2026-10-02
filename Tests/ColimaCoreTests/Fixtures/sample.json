@@ -1,0 +1,10 @@
+{
+  "vm": "{\"name\": \"default\", \"status\": \"Running\", \"cpus\": 10, \"memory\": 21474836480}",
+  "containers": "{\"ID\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"Names\": \"demo-web-1\", \"Image\": \"nginx:alpine\", \"State\": \"running\", \"Status\": \"Up 3 hours\", \"Ports\": \"0.0.0.0:8080->80/tcp, [::]:8080->80/tcp\", \"Labels\": \"com.docker.compose.project.working_dir=/tmp/demo,com.docker.compose.project=demo\"}\n{\"ID\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"Names\": \"demo-postgres-1\", \"Image\": \"postgres:17\", \"State\": \"running\", \"Status\": \"Up 3 hours (healthy)\", \"Ports\": \"127.0.0.1:5432->5432/tcp\", \"Labels\": \"com.docker.compose.project=demo\"}\n{\"ID\": \"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\", \"Names\": \"worker\", \"Image\": \"alpine:3.22\", \"State\": \"exited\", \"Status\": \"Exited (0) 2 days ago\", \"Ports\": \"\", \"Labels\": \"\"}",
+  "stats": "{\"ID\": \"aaaaaaaaaaaa\", \"CPUPerc\": \"1.25%\", \"MemUsage\": \"24MiB / 19.49GiB\", \"MemPerc\": \"0.12%\"}\n{\"ID\": \"bbbbbbbbbbbb\", \"CPUPerc\": \"0.30%\", \"MemUsage\": \"148MiB / 19.49GiB\", \"MemPerc\": \"0.74%\"}",
+  "logs": {
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "2026-10-02T10:00:00Z GET /health 200\n2026-10-02T10:00:05Z GET / 200",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "2026-10-02T10:00:00Z database system is ready to accept connections"
+  },
+  "sweep": "recent   demo (2)           last log 5m ago\nstale    worker             not running for 2d\n\n1 stale group would be removed. This window is a report only."
+}
