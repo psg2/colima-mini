@@ -49,8 +49,10 @@ package final class Command: @unchecked Sendable {
     var env = ProcessInfo.processInfo.environment
     env.removeValue(forKey: "DOCKER_HOST")
     env.removeValue(forKey: "DOCKER_CONTEXT")
-    env["PATH"] = Toolchain.searchPath(environment: env)
     env.merge(environment, uniquingKeysWith: { _, new in new })
+    // Apps opened from Finder inherit launchd's minimal PATH. Colima runs limactl
+    // by name, so the child needs the Homebrew directories too.
+    env["PATH"] = Toolchain.searchPath(environment: env)
     child.environment = env
     child.standardInput = FileHandle.nullDevice
     child.standardOutput = output
