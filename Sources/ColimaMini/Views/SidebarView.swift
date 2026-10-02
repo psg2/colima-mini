@@ -64,7 +64,9 @@ struct SidebarView: View {
               Label(
                 project,
                 systemImage: project == "Standalone"
-                  ? "shippingbox" : origin?.kind.symbol ?? "folder"
+                  ? "shippingbox"
+                  : model.orphanedProjects.contains(project)
+                    ? "folder.badge.questionmark" : origin?.kind.symbol ?? "folder"
               )
               .lineLimit(1).truncationMode(.middle)
               Spacer()

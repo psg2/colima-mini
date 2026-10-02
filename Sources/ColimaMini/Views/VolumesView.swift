@@ -26,8 +26,9 @@ struct VolumesView: View {
             .secondary)
         }
         Spacer()
-        Button("Reclaim space…") { model.openReclaim() }
+        Button("Remove anonymous…") { model.openReclaim(.volumes) }
           .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
+          .help("Preview unattached anonymous volumes, then remove the ones you choose")
         RefreshButton(busy: model.volumesLoading) { await model.loadVolumes() }
       }
       HStack {

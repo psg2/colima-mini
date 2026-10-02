@@ -53,6 +53,14 @@ struct CommandPalette: View {
           PaletteResult(
             id: "action.reclaim", title: "Reclaim space…", subtitle: "Action · preview first",
             symbol: "sparkles", run: { model.openReclaim() }))
+        values.append(
+          PaletteResult(
+            id: "action.sweep", title: "Review unused containers…",
+            subtitle: "Action · stale and orphaned stacks", symbol: "shippingbox",
+            run: {
+              model.navigate(.containers, project: "All containers")
+              Task { await model.scan() }
+            }))
       }
       values += (model.snapshot?.projects ?? []).filter { project in
         model.containers.contains { $0.project == project && $0.running }

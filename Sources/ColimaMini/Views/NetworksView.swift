@@ -25,6 +25,9 @@ struct NetworksView: View {
             .font(.caption).foregroundStyle(.secondary)
         }
         Spacer()
+        Button("Remove unused…") { model.openReclaim(.networks) }
+          .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
+          .help("Preview networks no container uses, then remove the ones you choose")
         RefreshButton(busy: model.networksLoading) { await model.loadNetworks() }
       }
       HStack {

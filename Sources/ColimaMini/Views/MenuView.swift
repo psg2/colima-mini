@@ -36,6 +36,24 @@ struct MenuView: View {
         Divider()
         attention
       }
+      let orphaned = model.orphanedProjects
+      if !orphaned.isEmpty {
+        Button {
+          model.navigate(.containers, project: "All containers")
+          showDashboard()
+          Task { await model.scan() }
+        } label: {
+          Label(
+            orphaned.count == 1
+              ? "\(orphaned[0]) points to a deleted folder"
+              : "\(orphaned.count) projects point to deleted folders",
+            systemImage: "folder.badge.questionmark"
+          ).lineLimit(1).truncationMode(.middle)
+        }.buttonStyle(.link).font(.caption)
+          .help("Review unused containers")
+          .disabled(model.scanning || model.busy)
+          .accessibilityIdentifier("menu.sweep")
+      }
       if let projects = model.snapshot?.projects, !projects.isEmpty {
         Divider()
         Text("Projects").font(.caption).foregroundStyle(.secondary)
@@ -52,15 +70,6 @@ struct MenuView: View {
           showDashboard()
         }.keyboardShortcut("d").accessibilityIdentifier("menu.dashboard")
         Spacer()
-        Button {
-          model.navigate(.storage)
-          showDashboard()
-          Task { await model.scan() }
-        } label: {
-          Image(systemName: "sparkles.rectangle.stack")
-        }.help("Review unused containers")
-          .disabled(model.scanning || model.busy || model.snapshot?.vm.running != true)
-          .accessibilityIdentifier("menu.sweep")
         Button {
           openSettings()
           NSApp.activate(ignoringOtherApps: true)
