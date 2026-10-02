@@ -5,12 +5,15 @@
 [![CI](https://github.com/psg2/colima-mini/actions/workflows/ci.yml/badge.svg)](https://github.com/psg2/colima-mini/actions/workflows/ci.yml)
 
 A native macOS dashboard for the default [Colima](https://github.com/abiosoft/colima)
-profile. Manage existing containers, inspect logs and ports, and change VM resources
-from a small SwiftUI app and menu bar panel.
+profile. Manage existing containers, inspect their logs, ports and mounts, and
+change VM resources from a small SwiftUI app and menu bar panel.
 
 Colima Mini is an independent, unofficial project licensed under MIT.
 
-![Compose projects and container logs](docs/images/dashboard.png)
+![The v0.4.0 dashboard with Compose projects and container logs](docs/images/dashboard.png)
+
+The screenshot and published v0.4.0 ZIP show the earlier dashboard layout.
+Build from source for the container pages, Volumes and Storage views described here.
 
 ## Install
 
@@ -37,21 +40,100 @@ dependencies; no Docker engine is bundled.
 Use Docker Compose separately to create your projects. The app manages existing
 containers and doesn't create Compose deployments or recreate missing services.
 
+### Open a downloaded release for the first time
+
+Download the ZIP and its matching `.sha256` file from the same release. In their
+download directory, verify the archive before extracting it:
+
+```sh
+shasum -a 256 -c ColimaMini-X.Y.Z-macos-universal.zip.sha256
+```
+
+Replace `X.Y.Z` with the release version. The result must end in `OK`. This checks
+the archive against the published checksum; it isn't Apple notarization.
+
+After moving the app to Applications, try opening it. If macOS blocks it because
+the developer can't be verified, follow Apple's
+[instructions for opening a trusted app](https://support.apple.com/en-us/102445):
+
+1. Open **System Settings** and select **Privacy & Security**.
+2. Find the message for **Colima Mini** and select **Open Anyway**.
+3. Review the app-specific prompt and select **Open** if you trust the download.
+
+This creates an exception for this app. Keep Gatekeeper enabled. Managed Macs
+might restrict this exception. You can also [build from source](#build-from-source).
+Confirm that the dashboard opens and reports the default Colima profile.
+
 ## Use
 
-- Expand or collapse Compose projects, or switch to a flat container list.
+Use the sidebar to open Containers, a Compose project, Volumes, Images, Storage
+or Settings. Press **Command+K** to search loaded objects and pages. Use the arrow
+keys to choose a result and Return to open it.
+Settings stays aligned at the bottom and is also available with **Command+,**.
+
+- Expand or collapse each Compose project, use the direct **Collapse all** or
+  **Expand all** action, or switch to a flat container list. Searching reveals
+  matching services without discarding your saved collapsed groups.
 - See project resource totals, VM allocation and container usage. Overview CPU is
   relative to allocated VM capacity; row CPU follows Docker's 100% per core convention.
 - Filter by project, search names or images, and show only running containers.
 - Start, stop and restart containers or displayed project groups, with confirmation.
-- Read the last 200 log lines, search them and copy the displayed text.
-- Inspect published ports, copy addresses and open them in a browser.
-- Open **Settings** or press **Command+,** to change CPU, RAM and refresh interval.
-- Use **Unused containers** for the bundled cleanup report. The app never applies cleanup.
+- Open a container page for Overview, Logs, Ports and Mounts. Use Back to return
+  to the originating list and its filters.
+- Read the last 200 log lines, pause refresh, follow the latest output, search
+  and copy the displayed text. Refresh is bounded polling, not an unlimited stream.
+- Inspect published port bindings and copy their addresses. TCP doesn't identify
+  an HTTP service, so database ports don't get an inferred browser URL.
+- Inspect named volumes and their container mount destinations. References include
+  stopped containers; an unattached volume isn't automatically safe to delete.
+- Open Storage for disk measurements and **Review unused containers**. The cleanup
+  scanner produces a report; the app never applies cleanup.
+- Change CPU, RAM and refresh interval in Settings.
+
+### Diagnose a container
+
+Overview shows health, exit code, OOM status and restart count. Inspection updates
+after a lifecycle action, on explicit Refresh, and every 30 seconds while Overview
+is active. CPU and memory history keeps up to 60 samples collected while the
+dashboard is open. Missing measurements remain unavailable.
+
+Only a visible, active Logs tab refreshes. Search pauses automatic following;
+Pause keeps the last buffer. A refresh error preserves that buffer and shows a
+separate error with its fetch time. Ports requires an explicit HTTP or HTTPS choice
+when opening a web endpoint.
+
+### Inspect images
+
+Images shows virtual, shared and unique layer sizes and links to containers using
+an image, including stopped containers. Shared layers make summed image virtual
+sizes different from physical disk usage. The view is read-only.
+
+### Understand storage measurements
+
+Storage reports these measurements separately:
+
+- **Configured capacity:** the Colima data disk's configured limit.
+- **VM filesystem:** its size, used bytes and available bytes. Filesystem overhead
+  and reserved blocks can make available space smaller than size minus used space.
+- **Docker objects:** images, containers, volumes and build cache, with Docker's
+  reclaimable estimates. Shared image layers aren't independent physical copies.
+- **Mac disk footprint:** allocated blocks of the identified VM image files.
+  Sparse files can have a logical size larger than their allocated blocks.
+
+Unknown sizes and unsupported VM image layouts show Unavailable rather than zero.
+Mac allocation is an estimate under APFS sharing and compression. Docker reclaimable
+bytes don't promise an equal reduction in the Mac disk footprint. Volume metadata
+uses Linux mount paths; these aren't folders you can open in Finder.
+
+Storage refreshes separately from the container list. A storage read failure
+doesn't prevent container navigation or controls. The app doesn't prune Docker
+objects, remove volumes, resize VM disks or compact disk images.
+
+### Change VM resources
 
 **Save for next start** updates CPU and memory without interrupting the VM.
 **Apply & restart…** asks for confirmation, restarts Colima, verifies its allocation,
-and starts containers that were running before the restart. Docker volumes are kept.
+and restores the containers running immediately before Colima was stopped. Docker volumes are kept.
 Settings modify only root `cpu` and `memory` fields in the local profile, preserving
 other settings, comments and permissions. The first original file is retained as
 `colima.yaml.mini-backup` beside the profile.
@@ -82,7 +164,9 @@ To preview with synthetic data:
 ./Scripts/run.sh --fixture "$PWD/Tests/ColimaCoreTests/Fixtures/sample.json"
 ```
 
-Sample mode disables runtime, container and resource changes.
+The launcher creates a separate Sample instance even if the real dashboard is
+already running. Confirm that its title includes **Sample data** and its sidebar
+shows **Sample**. Sample mode disables runtime, container and resource changes.
 
 To check your actual runtime without opening a window:
 
@@ -115,8 +199,10 @@ flowchart LR
 
 ```text
 Sources/ColimaCore/       Runtime operations, process execution, models and config
-Sources/ColimaMini/       App entry point, observable state and individual views
+Sources/ColimaAppState/   Navigation, refresh coordination and observable state
+Sources/ColimaMini/       App entry point and individual SwiftUI views
 Tests/ColimaCoreTests/    Parser, process, config and runtime integration tests
+Tests/ColimaAppStateTests/ Navigation and observable state tests
 Resources/               Application icon source
 Scripts/                 Build, verification, packaging and installation
 .github/workflows/       macOS CI and tag-based release publication

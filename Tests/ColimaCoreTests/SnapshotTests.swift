@@ -59,7 +59,7 @@ final class SnapshotTests: XCTestCase {
     } catch {}
     do {
       try await backend.apply(
-        ResourceSettings(cpus: 2, memoryGiB: 2), restart: false, snapshot: backend.snapshot())
+        ResourceSettings(cpus: 2, memoryGiB: 2), restart: false)
       XCTFail("Sample resources were saved")
     } catch {}
   }

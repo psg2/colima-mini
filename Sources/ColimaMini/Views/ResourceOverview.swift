@@ -1,35 +1,30 @@
-import AppKit
 import ColimaCore
-import Combine
-import Foundation
 import SwiftUI
 
 struct ResourceOverview: View {
   let snapshot: Snapshot
   var body: some View {
-    let memory = snapshot.totalMemory(snapshot.containers)
-    let cpu = snapshot.totalCPU(snapshot.containers) / Double(max(1, snapshot.vm.cpus))
     HStack(spacing: 24) {
-      VStack(alignment: .leading, spacing: 4) {
-        Text("Container CPU").font(.caption).foregroundStyle(.secondary)
-        Text(String(format: "%.1f%% of %d CPUs", cpu, snapshot.vm.cpus)).monospacedDigit()
-        ProgressView(value: min(1, cpu / 100)).tint(.teal)
+      Text(
+        String(
+          format: "Container CPU %.1f%% of %d CPUs",
+          snapshot.totalCPU(snapshot.containers) / Double(max(1, snapshot.vm.cpus)),
+          snapshot.vm.cpus))
+      Text(
+        "Memory " + memoryText(snapshot.totalMemory(snapshot.containers)) + " / "
+          + memoryText(Double(snapshot.vm.memory)))
+      let attention = snapshot.containers.filter(\.needsAttention).count
+      if attention > 0 {
+        Label(
+          attention == 1 ? "1 needs attention" : "\(attention) need attention",
+          systemImage: "exclamationmark.triangle"
+        )
+        .foregroundStyle(.orange)
       }
-      VStack(alignment: .leading, spacing: 4) {
-        Text("Container memory").font(.caption).foregroundStyle(.secondary)
-        Text(memoryText(memory) + " / " + memoryText(Double(snapshot.vm.memory))).monospacedDigit()
-        ProgressView(value: min(1, memory / Double(max(1, snapshot.vm.memory)))).tint(.teal)
-      }
-      VStack(alignment: .leading, spacing: 4) {
-        Text("Published ports").font(.caption).foregroundStyle(.secondary)
-        Text("\(snapshot.containers.flatMap(\.endpoints).count) endpoints").monospacedDigit()
-        Text("Select a container to open").font(.caption).foregroundStyle(.secondary)
-      }
-    }.padding(14).background(
-      Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10)
-    )
-    .help(
-      "Container totals exclude the VM operating system. CPU is relative to the allocated VM capacity."
-    )
+      Spacer()
+    }.font(.caption).foregroundStyle(.secondary).monospacedDigit()
+      .help(
+        "All container totals exclude the VM operating system. Overall CPU is relative to VM capacity; row CPU is 100% per core."
+      )
   }
 }

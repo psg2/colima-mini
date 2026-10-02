@@ -1,4 +1,5 @@
 import AppKit
+import ColimaAppState
 import ColimaCore
 import Foundation
 import SwiftUI

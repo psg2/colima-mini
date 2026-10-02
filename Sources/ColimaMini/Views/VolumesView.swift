@@ -1,0 +1,188 @@
+import ColimaAppState
+import ColimaCore
+import SwiftUI
+
+struct VolumesView: View {
+  @ObservedObject var model: Dashboard
+  var visible: [Volume] {
+    model.volumes.filter {
+      (model.volumeSearch.isEmpty
+        || ($0.name + " " + ($0.project ?? "")).localizedCaseInsensitiveContains(model.volumeSearch))
+        && (!model.unattachedOnly || $0.attached == false)
+    }.sorted {
+      model.volumeSortBySize
+        ? ($0.sizeBytes ?? -1) > ($1.sizeBytes ?? -1)
+        : $0.name.localizedStandardCompare($1.name) == .orderedAscending
+    }
+  }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack {
+        VStack(alignment: .leading, spacing: 5) {
+          Text("Volumes").font(.system(.title, design: .rounded).weight(.semibold))
+          Text("Persistent data and the containers that use it").font(.caption).foregroundStyle(
+            .secondary)
+        }
+        Spacer()
+        RefreshButton(busy: model.volumesLoading) { await model.loadVolumes() }
+      }
+      HStack {
+        TextField("Filter volumes or projects", text: $model.volumeSearch).textFieldStyle(
+          .roundedBorder)
+        Toggle("Unattached only", isOn: $model.unattachedOnly).toggleStyle(.checkbox)
+        Picker("Sort", selection: $model.volumeSortBySize) {
+          Text("Name").tag(false)
+          Text("Size").tag(true)
+        }
+        .frame(width: 130)
+      }
+      Text(
+        "Unattached volumes have no container references. Their data may still be important; stopped containers also count as references."
+      )
+      .font(.caption).foregroundStyle(.secondary)
+      if let error = model.volumesError { StatusMessage(text: error) }
+      if model.volumesLoading { ProgressView().controlSize(.small) }
+      if visible.isEmpty && !model.volumesLoading {
+        EmptyPage(
+          title: model.volumesError == nil ? "No matching volumes" : "Volumes unavailable",
+          message: model.volumesError == nil
+            ? "Adjust the filter or start Colima and refresh."
+            : "Refresh after the runtime becomes available.", symbol: "externaldrive")
+      } else {
+        ScrollView {
+          LazyVStack(spacing: 1) {
+            ForEach(visible) { volume in
+              Button {
+                model.openVolume(volume.name)
+              } label: {
+                HStack(spacing: 12) {
+                  Image(systemName: "externaldrive").foregroundStyle(.secondary)
+                  VStack(alignment: .leading, spacing: 5) {
+                    Text(volume.name).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
+                    Text(
+                      (volume.project.map { $0 + " · " } ?? "") + volume.driver
+                        + " · "
+                        + (volume.referencesAvailable
+                          ? "\(volume.references.count) container references"
+                          : "Reference data unavailable")
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
+                  }
+                  Spacer()
+                  Text(volume.attached.map { $0 ? "Attached" : "Unattached" } ?? "Use unknown")
+                    .font(.caption).foregroundStyle(.secondary)
+                  Text(bytesText(volume.sizeBytes)).monospacedDigit().frame(
+                    width: 95, alignment: .trailing)
+                  Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                }.padding(12).contentShape(Rectangle())
+              }.buttonStyle(.plain).accessibilityIdentifier("volume.row." + volume.name)
+              Divider()
+            }
+          }
+        }
+      }
+      if let date = model.volumesDate {
+        Text("Measured " + date.formatted(date: .omitted, time: .standard)).font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }.padding(24).task { await model.loadVolumes() }
+  }
+}
+struct VolumeDetailView: View {
+  @ObservedObject var model: Dashboard
+  let name: String
+  var volume: Volume? { model.volumes.first { $0.name == name } }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 20) {
+      Button {
+        model.goBack()
+      } label: {
+        Label("Back", systemImage: "chevron.left")
+      }
+      .buttonStyle(.plain).foregroundStyle(.secondary).accessibilityIdentifier("volume.back")
+      HStack {
+        VStack(alignment: .leading, spacing: 6) {
+          Text(name).font(.system(.title, design: .rounded).weight(.semibold)).textSelection(
+            .enabled)
+          if let volume {
+            Text("\(bytesText(volume.sizeBytes)) · \(volume.driver)").foregroundStyle(.secondary)
+          }
+        }
+        Spacer()
+        RefreshButton(busy: model.volumesLoading) { await model.loadVolumes() }
+      }
+      if let error = model.volumesError { StatusMessage(text: error) }
+      if model.volumesLoading { ProgressView().controlSize(.small) }
+      if let volume {
+        if let issue = volume.dataIssue { StatusMessage(text: issue) }
+        Grid(alignment: .leading, horizontalSpacing: 30, verticalSpacing: 14) {
+          GridRow {
+            Text("Project").foregroundStyle(.secondary)
+            Text(volume.project ?? "No project label")
+          }
+          GridRow {
+            Text("Use").foregroundStyle(.secondary)
+            Text(
+              volume.attached.map { $0 ? "Attached, including stopped containers" : "Unattached" }
+                ?? "Reference data unavailable")
+          }
+          GridRow {
+            Text("Created").foregroundStyle(.secondary)
+            Text(volume.createdAt ?? "Unavailable")
+          }
+          if let mountpoint = volume.mountpoint {
+            GridRow {
+              Text("Path in VM").foregroundStyle(.secondary)
+              Text(mountpoint).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+            }
+          }
+        }
+        Divider()
+        Text("Attached containers").font(.headline)
+        ScrollView {
+          VStack(alignment: .leading, spacing: 12) {
+            ForEach(volume.references) { reference in
+              Button {
+                model.openContainer(reference.containerID)
+              } label: {
+                HStack {
+                  Image(systemName: "shippingbox")
+                  VStack(alignment: .leading, spacing: 5) {
+                    Text(reference.containerName)
+                    Text(reference.destination).font(.system(.caption, design: .monospaced))
+                      .foregroundStyle(.secondary)
+                  }
+                  Spacer()
+                  Text(reference.running ? "Running" : "Stopped").font(.caption).foregroundStyle(
+                    .secondary)
+                  Text(reference.readOnly ? "Read only" : "Read / write").font(.caption)
+                    .foregroundStyle(.secondary)
+                  Image(systemName: "chevron.right").font(.caption)
+                }.padding(12).background(
+                  Color.teal.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
+              }.buttonStyle(.plain).accessibilityIdentifier(
+                "volume.container." + reference.containerName)
+            }
+            if volume.references.isEmpty {
+              Text(
+                volume.referencesAvailable
+                  ? "No existing containers reference this volume."
+                  : "Container references could not be measured."
+              )
+              .foregroundStyle(.secondary)
+            }
+          }
+        }
+        Text("Data is inside the Colima VM. This page does not delete or edit volume contents.")
+          .font(.caption).foregroundStyle(.secondary)
+      } else if !model.volumesLoading {
+        EmptyPage(
+          title: "Volume unavailable",
+          message:
+            "It may have been removed or the runtime cannot be reached. Return to Volumes and refresh.",
+          symbol: "externaldrive")
+      }
+      Spacer(minLength: 0)
+    }.padding(24).task { await model.loadVolumes() }
+  }
+}

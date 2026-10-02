@@ -28,23 +28,31 @@ package struct Backend {
     }
     return try await command("colima", [verb, "default"], timeout: 180)
   }
-  private func command(_ name: String, _ arguments: [String], timeout: Double = 15) async throws
+  private func command(
+    _ name: String, _ arguments: [String], timeout: Double = 15,
+    outputPolicy: Command.OutputPolicy = .stdout
+  ) async throws
     -> String
   {
     try await Command.run(
-      toolchain.executable(name), arguments, timeout: timeout, environment: toolchain.environment)
+      toolchain.executable(name), arguments, timeout: timeout, environment: toolchain.environment,
+      outputPolicy: outputPolicy)
   }
-  package func apply(_ resources: ResourceSettings, restart: Bool, snapshot: Snapshot) async throws
-  {
+  package func apply(_ resources: ResourceSettings, restart: Bool) async throws {
     guard fixture == nil else {
       throw AppError.message("Resource changes are disabled in sample mode.")
     }
+    if !restart {
+      try resources.save(to: configurationURL)
+      return
+    }
+    let before = try await inventory()
+    let previouslyRunning = Set(before.containers.filter(\.running).map(\.id))
     try resources.save(to: configurationURL)
-    if !restart { return }
-    if snapshot.vm.running { _ = try await vm("stop") }
+    if before.vm.running { _ = try await vm("stop") }
     _ = try await command(
       "colima", ["start", "default", "--activate=false", "--save-config=false"], timeout: 240)
-    let after = try await self.snapshot()
+    let after = try await inventory()
     guard after.vm.running, after.vm.cpus == resources.cpus,
       abs(Double(after.vm.memory) / 1_073_741_824 - resources.memoryGiB) < 0.01
     else {
@@ -52,15 +60,37 @@ package struct Backend {
         "Resources were saved, but Colima did not start with the requested allocation. Check its status before retrying."
       )
     }
-    let previouslyRunning = Set(snapshot.containers.filter(\.running).map(\.id))
     let stopped = after.containers.filter { previouslyRunning.contains($0.id) && !$0.running }
-    if !stopped.isEmpty { _ = try await docker(["start"] + stopped.map(\.id), timeout: 90) }
+    do {
+      if !stopped.isEmpty { _ = try await docker(["start"] + stopped.map(\.id), timeout: 90) }
+      let restored = try await inventory()
+      let running = Set(restored.containers.filter(\.running).map(\.id))
+      let missing = previouslyRunning.subtracting(running)
+      guard missing.isEmpty else {
+        throw AppError.message(
+          "\(missing.count) previously running container(s) are missing or stopped.")
+      }
+    } catch {
+      throw AppError.message(
+        "Resources applied, but container restoration is incomplete: " + error.localizedDescription)
+    }
   }
-  package func docker(_ arguments: [String], timeout: Double = 15) async throws -> String {
+  package func docker(
+    _ arguments: [String], timeout: Double = 15,
+    outputPolicy: Command.OutputPolicy = .stdout
+  ) async throws -> String {
     guard fixture == nil else {
       throw AppError.message("Runtime actions are disabled in sample mode.")
     }
-    return try await command("docker", ["--context", "colima"] + arguments, timeout: timeout)
+    return try await command(
+      "docker", ["--context", "colima"] + arguments, timeout: timeout, outputPolicy: outputPolicy)
+  }
+  private func inventory() async throws -> Snapshot {
+    let vmOutput = try await command("colima", ["list", "--json"])
+    let vmOnly = try Snapshot.decode(vm: vmOutput, containers: "", stats: "")
+    guard vmOnly.vm.running else { return vmOnly }
+    let containers = try await docker(["ps", "--all", "--no-trunc", "--format", "{{json .}}"])
+    return try Snapshot.decode(vm: vmOutput, containers: containers, stats: "")
   }
   package func snapshot() async throws -> Snapshot {
     if let fixture { return try fixture.snapshot }
@@ -73,7 +103,7 @@ package struct Backend {
   }
   package func logs(_ id: String) async throws -> String {
     if let fixture { return fixture.logs?[id] ?? "No logs in this sample." }
-    return try await docker(["logs", "--timestamps", "--tail", "200", id])
+    return try await docker(["logs", "--timestamps", "--tail", "200", id], outputPolicy: .combined)
   }
   package func sweep() async throws -> String {
     if let fixture { return fixture.sweep ?? "Nothing to clean up." }

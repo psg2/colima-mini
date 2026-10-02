@@ -80,4 +80,25 @@ output="$(sweep --apply --idle-for 4d)"
 [[ "$(cat "$log")" == "$(printf '%s\n' 'rm -f orphan000001' 'network rm net-gone' 'rm -f stale0000001' 'network rm net-stale')" ]] \
   || { output="$(cat "$log")"; fail "--idle-for 4d stopped a stack quiet for only 3 days"; }
 
+for operation in ps inspect logs stats; do
+  if output="$(FAKE_DOCKER_FAIL="$operation" sweep --sample 1 2>&1)"; then
+    fail "failed $operation probe was accepted"
+  fi
+  [[ "$output" == *"Scan failed:"* ]] || fail "failed probe did not show a scan error"
+  [[ "$output" != *"No containers."* && "$output" != *"Nothing to clean up."* ]] \
+    || fail "failed probe looked like a successful empty scan"
+done
+if output="$(FAKE_LSOF_MODE=fail sweep 2>&1)"; then
+  fail "failed client probe was accepted"
+fi
+[[ "$output" == *"Scan failed:"* && "$output" != *"idle "* ]] \
+  || fail "failed client probe classified containers as idle"
+output="$(FAKE_LSOF_MODE=empty sweep)"
+[[ "$output" != *"Scan failed:"* ]] || fail "lsof's successful empty query was rejected"
+if output="$(FAKE_DOCKER_FAIL=rm sweep --apply 2>&1)"; then
+  fail "rejected cleanup was accepted"
+fi
+[[ "$output" == *"Scan failed:"* && "$output" != *"removed  "* ]] \
+  || fail "rejected cleanup claimed it removed containers"
+
 printf 'docker-sweep: ok\n'

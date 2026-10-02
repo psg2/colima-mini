@@ -40,6 +40,7 @@ final class BackendTests: XCTestCase {
               config = pathlib.Path(os.environ['COLIMA_TEST_CONFIG']).read_text()
               vm.update(status='Running', cpus=int(re.search(r'^cpu: ([0-9]+)', config, re.M)[1]),
                         memory=int(float(re.search(r'^memory: ([0-9.]+)', config, re.M)[1]) * 2**30))
+              rows = [row for row in rows if row['ID'] != data.get('remove_on_start')]
           else:
               sys.exit('unsupported VM operation')
           data['vm'] = json.dumps(vm)
@@ -50,13 +51,16 @@ final class BackendTests: XCTestCase {
           if args[0] == 'ps':
               print(data['containers'])
           elif args[0] == 'stats':
+              if data.get('fail_stats'): sys.exit('synthetic metrics failure')
               print(data['stats'])
           elif args[0] == 'start':
               for row in rows:
-                  if row['ID'] in args[1:]: row['State'], row['Status'] = 'running', 'Up just now'
+                  if row['ID'] in args[1:] and row['ID'] != data.get('fail_restore'):
+                      row['State'], row['Status'] = 'running', 'Up just now'
           elif args[0] == 'logs':
-              print('stdout log')
-              print('stderr log', file=sys.stderr)
+              print('2026-10-02T12:00:00Z stdout log', flush=True)
+              print('2026-10-02T12:00:01Z stderr log', file=sys.stderr, flush=True)
+              print('2026-10-02T12:00:01Z equal timestamp\nmultiline body', flush=True)
           else:
               sys.exit('unsupported container operation')
       data['containers'] = '\n'.join(json.dumps(row) for row in rows)
@@ -90,7 +94,7 @@ final class BackendTests: XCTestCase {
     try await runtime { backend, config in
       let before = try await backend.snapshot()
       let desired = ResourceSettings(cpus: 1, memoryGiB: 2.5)
-      try await backend.apply(desired, restart: true, snapshot: before)
+      try await backend.apply(desired, restart: true)
       let after = try await backend.snapshot()
       XCTAssertEqual(after.vm.cpus, 1)
       XCTAssertEqual(after.vm.memory, Int64(2.5 * 1_073_741_824))
@@ -104,7 +108,7 @@ final class BackendTests: XCTestCase {
     try await runtime { backend, _ in
       let before = try await backend.snapshot()
       let desired = ResourceSettings(cpus: 1, memoryGiB: 2)
-      try await backend.apply(desired, restart: false, snapshot: before)
+      try await backend.apply(desired, restart: false)
       let after = try await backend.snapshot()
       XCTAssertEqual(try backend.settings(), desired)
       XCTAssertEqual(after.vm.cpus, before.vm.cpus)
@@ -117,6 +121,75 @@ final class BackendTests: XCTestCase {
       let logs = try await backend.logs("sample")
       XCTAssertTrue(logs.contains("stdout log"))
       XCTAssertTrue(logs.contains("stderr log"))
+      XCTAssertEqual(
+        logs,
+        "2026-10-02T12:00:00Z stdout log\n2026-10-02T12:00:01Z stderr log\n2026-10-02T12:00:01Z equal timestamp\nmultiline body\n"
+      )
+    }
+  }
+  func testResourceRestartCapturesExternallyChangedRunningSet() async throws {
+    try await runtime { backend, config in
+      let state = config.deletingLastPathComponent().appendingPathComponent("state.json")
+      var object = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+      let rows = try Snapshot.lines(object["containers"] as! String, as: Container.self)
+      let previouslyStopped = try XCTUnwrap(rows.first { !$0.running })
+      let encoded = try (object["containers"] as! String).split(separator: "\n").map {
+        original -> [String: Any] in
+        var value = try JSONSerialization.jsonObject(with: Data(original.utf8)) as! [String: Any]
+        value["State"] = value["ID"] as? String == previouslyStopped.id ? "running" : "exited"
+        value["Status"] =
+          value["ID"] as? String == previouslyStopped.id ? "Up just now" : "Exited (0) just now"
+        return value
+      }
+      object["containers"] = try encoded.map {
+        String(decoding: try JSONSerialization.data(withJSONObject: $0), as: UTF8.self)
+      }.joined(separator: "\n")
+      try JSONSerialization.data(withJSONObject: object).write(to: state)
+      try await backend.apply(ResourceSettings(cpus: 1, memoryGiB: 2), restart: true)
+      let after = try await backend.snapshot()
+      XCTAssertEqual(Set(after.containers.filter(\.running).map(\.id)), [previouslyStopped.id])
+    }
+  }
+  func testResourceRestartReportsMissingOrUnrestoredContainers() async throws {
+    for failure in ["remove_on_start", "fail_restore"] {
+      try await runtime { backend, config in
+        let before = try await backend.snapshot()
+        let running = try XCTUnwrap(before.containers.first { $0.running })
+        let state = config.deletingLastPathComponent().appendingPathComponent("state.json")
+        var object =
+          try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+        object[failure] = running.id
+        try JSONSerialization.data(withJSONObject: object).write(to: state)
+        do {
+          try await backend.apply(
+            ResourceSettings(cpus: 1, memoryGiB: 2), restart: true)
+          XCTFail("Partial restoration was accepted")
+        } catch {
+          XCTAssertTrue(error.localizedDescription.contains("restoration is incomplete"))
+        }
+        let after = try await backend.snapshot()
+        XCTAssertEqual(after.vm.cpus, 1)
+        XCTAssertFalse(after.containers.contains { $0.id == running.id && $0.running })
+      }
+    }
+  }
+  func testResourceRestartDoesNotDependOnMetricsAvailability() async throws {
+    try await runtime { backend, config in
+      let before = try await backend.snapshot()
+      let state = config.deletingLastPathComponent().appendingPathComponent("state.json")
+      var object = try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+      object["fail_stats"] = true
+      try JSONSerialization.data(withJSONObject: object).write(to: state)
+      try await backend.apply(
+        ResourceSettings(cpus: 1, memoryGiB: 2), restart: true)
+      let restored =
+        try JSONSerialization.jsonObject(with: Data(contentsOf: state)) as! [String: Any]
+      let after = try Snapshot.decode(
+        vm: restored["vm"] as! String, containers: restored["containers"] as! String, stats: "")
+      XCTAssertEqual(after.vm.cpus, 1)
+      XCTAssertEqual(
+        Set(after.containers.filter(\.running).map(\.id)),
+        Set(before.containers.filter(\.running).map(\.id)))
     }
   }
 }
