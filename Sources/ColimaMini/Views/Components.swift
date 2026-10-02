@@ -215,3 +215,46 @@ struct ImageIcon: View {
       .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 5))
   }
 }
+
+// Like Open: one click uses the default terminal, and the menu picks another
+// terminal, which becomes the default.
+struct ShellButton: View {
+  @ObservedObject var model: Dashboard
+  let container: Container
+  var body: some View {
+    let preferred = ExternalApps.terminal
+    Menu {
+      ForEach(ExternalApps.terminals) { app in
+        Button {
+          ExternalApps.setTerminal(app)
+          Launcher.shell(container, model: model)
+        } label: {
+          Label {
+            Text(app == preferred ? "\(app.name) (default)" : app.name)
+          } icon: {
+            Image(nsImage: app.icon)
+          }
+        }
+      }
+      Divider()
+      Button("Copy docker exec command") {
+        Launcher.copy("docker --context colima exec -it \(container.name) sh")
+      }
+    } label: {
+      if let preferred {
+        Label {
+          Text("Shell")
+        } icon: {
+          Image(nsImage: preferred.icon)
+        }
+      } else {
+        Label("Shell", systemImage: "terminal")
+      }
+    } primaryAction: {
+      Launcher.shell(container, model: model)
+    }
+    .fixedSize().disabled(model.sample)
+    .help("Open a shell in \(container.name)" + (preferred.map { " using \($0.name)" } ?? ""))
+    .accessibilityIdentifier("container.shell")
+  }
+}

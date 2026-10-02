@@ -70,7 +70,7 @@ import SwiftUI
         CommandGroup(replacing: .newItem) {}
         AppCommands(model: model)
       }
-    Settings { SettingsView(model: model) }
+    Settings { SettingsView(model: model, tabbed: true) }
     MenuBarExtra {
       MenuView(model: model)
     } label: {

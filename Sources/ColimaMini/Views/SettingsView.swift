@@ -124,21 +124,65 @@ struct SettingsView: View {
     guard let vm = model.snapshot?.vm else { return nil }
     return "Current VM: " + vm.allocation
   }
+  // The Settings window (⌘,) uses tabs so it fits on screen; the dashboard
+  // page shows every section in one scrolling column.
+  var tabbed = false
   var body: some View {
-    VStack(alignment: .leading, spacing: 20) {
-      HStack {
-        if let icon = NSApp.applicationIconImage {
-          Image(nsImage: icon).resizable().frame(width: 48, height: 48)
-        }
-        VStack(alignment: .leading, spacing: 3) {
-          Text("Settings").font(.title2.weight(.semibold))
-          Text("Default Colima profile").foregroundStyle(.secondary)
-        }
-        Spacer()
-        if model.sample {
-          Text("Sample · changes disabled").font(.caption).foregroundStyle(.orange)
+    Group {
+      if tabbed {
+        TabView {
+          resourcesTab.padding(20).tabItem { Label("Resources", systemImage: "cpu") }
+          appsTab.padding(20).tabItem { Label("Apps", systemImage: "square.grid.2x2") }
+          generalTab.padding(20).tabItem { Label("General", systemImage: "gearshape") }
+        }.frame(width: 560)
+      } else {
+        VStack(alignment: .leading, spacing: 20) {
+          HStack {
+            if let icon = NSApp.applicationIconImage {
+              Image(nsImage: icon).resizable().frame(width: 48, height: 48)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+              Text("Settings").font(.title2.weight(.semibold))
+              Text("Default Colima profile").foregroundStyle(.secondary)
+            }
+            Spacer()
+            if model.sample {
+              Text("Sample · changes disabled").font(.caption).foregroundStyle(.orange)
+            }
+          }
+          resourcesTab
+          appsTab
+          generalTab
+        }.padding(24).frame(width: 570)
+      }
+    }
+    .onAppear { load() }
+    .onChange(of: model.refreshInterval) { _, _ in model.savePreferences() }
+    .onChange(of: model.notificationsEnabled) { _, enabled in
+      model.savePreferences()
+      if enabled { Notifier.shared.requestAuthorization() }
+    }
+    .confirmationDialog(
+      "Apply resource changes?", isPresented: $confirming, titleVisibility: .visible
+    ) {
+      Button(
+        model.snapshot?.vm.running == true ? "Restart Colima" : "Start Colima", role: .destructive
+      ) {
+        Task {
+          await model.changeResources(proposed, restart: true)
+          load()
         }
       }
+    } message: {
+      Text(
+        "Use \(Int(cpus)) CPUs and \(String(format: "%.1f", memory)) GiB"
+          + (proposed.diskGiB.map { " with a \($0) GiB disk" } ?? "")
+          + ". Running containers will be interrupted while the VM restarts."
+      )
+    }
+  }
+  private var resourcesTab: some View {
+    VStack(alignment: .leading, spacing: 20) {
       GroupBox("Virtual machine resources") {
         VStack(alignment: .leading, spacing: 16) {
           HStack {
@@ -219,7 +263,15 @@ struct SettingsView: View {
           Text("Applying resources…").font(.caption)
         }
       }
+    }
+  }
+  private var appsTab: some View {
+    VStack(alignment: .leading, spacing: 20) {
       GroupBox("Apps") { appPickers.padding(10) }
+    }
+  }
+  private var generalTab: some View {
+    VStack(alignment: .leading, spacing: 20) {
       GroupBox("Dashboard") {
         VStack(alignment: .leading, spacing: 12) {
           HStack {
@@ -252,30 +304,6 @@ struct SettingsView: View {
       }
       Text("Context: colima · Resource changes stay in your local Colima profile.")
         .font(.caption).foregroundStyle(.secondary)
-    }.padding(24).frame(width: 570)
-      .onAppear { load() }
-      .onChange(of: model.refreshInterval) { _, _ in model.savePreferences() }
-      .onChange(of: model.notificationsEnabled) { _, enabled in
-        model.savePreferences()
-        if enabled { Notifier.shared.requestAuthorization() }
-      }
-      .confirmationDialog(
-        "Apply resource changes?", isPresented: $confirming, titleVisibility: .visible
-      ) {
-        Button(
-          model.snapshot?.vm.running == true ? "Restart Colima" : "Start Colima", role: .destructive
-        ) {
-          Task {
-            await model.changeResources(proposed, restart: true)
-            load()
-          }
-        }
-      } message: {
-        Text(
-          "Use \(Int(cpus)) CPUs and \(String(format: "%.1f", memory)) GiB"
-            + (proposed.diskGiB.map { " with a \($0) GiB disk" } ?? "")
-            + ". Running containers will be interrupted while the VM restarts."
-        )
-      }
+    }
   }
 }
