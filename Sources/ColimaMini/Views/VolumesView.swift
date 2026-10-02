@@ -177,9 +177,9 @@ private struct VolumeRow: View {
   }
   private var useDescription: String {
     switch volume.attached {
-    case true: return "Attached"
-    case false: return "Unattached"
-    case nil: return "Use unknown"
+    case .some(true): return "Attached"
+    case .some(false): return "Unattached"
+    case .none: return "Use unknown"
     }
   }
   var body: some View {
