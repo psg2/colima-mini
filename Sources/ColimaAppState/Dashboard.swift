@@ -78,6 +78,12 @@ package struct PendingAction: Identifiable {
   @Published package var storage: StorageSnapshot?
   @Published package var storageError: String?
   @Published package var storageLoading = false
+  @Published package var cleanupPlan: CleanupPlan?
+  @Published package var cleanupError: String?
+  @Published package var cleanupLoading = false
+  @Published package var cleanupResult: CleanupResult?
+  @Published package var reclaiming = false
+  @Published package var showingReclaim = false
   @Published package var history: [String: [MetricSample]] = [:]
   @Published package var totalHistory: [MetricSample] = []
   @Published package var notificationsEnabled = true
@@ -360,6 +366,46 @@ package struct PendingAction: Identifiable {
       storage = result
       storageError = nil
     } catch is CancellationError {} catch { storageError = error.localizedDescription }
+  }
+  package func openReclaim() {
+    cleanupResult = nil
+    showingReclaim = true
+  }
+  package func loadCleanupPlan() async {
+    guard !cleanupLoading, !reclaiming else { return }
+    cleanupLoading = true
+    defer { cleanupLoading = false }
+    do {
+      let task = Task { try await backend.cleanupPlan() }
+      cleanupPlan = try await task.value
+      cleanupError = nil
+    } catch is CancellationError {} catch {
+      cleanupPlan = nil
+      cleanupError = error.localizedDescription
+    }
+  }
+  // Removes the previewed items of the chosen kinds, then re-measures. The plan
+  // is replaced afterwards, so a second run starts from a fresh preview.
+  package func reclaim(_ kinds: Set<CleanupKind>) async {
+    guard !sample, !busy, !reclaiming, let plan = cleanupPlan, !kinds.isEmpty else { return }
+    invalidateRefresh()
+    busy = true
+    reclaiming = true
+    let now = Date()
+    for item in plan.category(.stoppedContainers)?.items ?? [] { actedOn[item.id] = now }
+    do {
+      let task = Task { try await backend.reclaim(plan, kinds: kinds) }
+      cleanupResult = try await task.value
+      cleanupError = nil
+    } catch { cleanupError = "Cleanup stopped: " + error.localizedDescription }
+    reclaiming = false
+    busy = false
+    cleanupPlan = nil
+    await refresh()
+    await loadCleanupPlan()
+    await loadStorage()
+    if !volumes.isEmpty { await loadVolumes() }
+    if !images.isEmpty { await loadImages() }
   }
   package func request(_ verb: String, containers: [Container], vm: Bool = false) {
     guard !sample, !busy, vm || !containers.isEmpty else { return }

@@ -13,6 +13,10 @@ struct StorageView: View {
               .font(.caption).foregroundStyle(.secondary)
           }
           Spacer()
+          Button("Reclaim space…") { model.openReclaim() }
+            .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
+            .help("Preview unused Docker objects and remove the ones you choose")
+            .accessibilityIdentifier("storage.reclaim")
           RefreshButton(busy: model.storageLoading) { await model.loadStorage() }
         }
         if let error = model.storageError { StatusMessage(text: error) }
@@ -86,6 +90,19 @@ struct StorageView: View {
         } else if !model.storageLoading {
           Text("Refresh to measure storage. Colima will not be started automatically.")
             .foregroundStyle(.secondary)
+        }
+        Divider()
+        HStack {
+          VStack(alignment: .leading, spacing: 5) {
+            Text("Reclaim space").font(.headline)
+            Text(
+              "Preview build cache, unused images, networks, stopped containers and unattached anonymous volumes, then remove what you choose. Named volumes are kept."
+            ).font(.caption).foregroundStyle(.secondary).fixedSize(
+              horizontal: false, vertical: true)
+          }
+          Spacer()
+          Button("Reclaim space…") { model.openReclaim() }
+            .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
         }
         Divider()
         HStack {

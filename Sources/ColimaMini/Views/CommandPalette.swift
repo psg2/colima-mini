@@ -47,7 +47,15 @@ struct CommandPalette: View {
         route: .image($0.id))
     }
     // Actions appear once the user types, so the empty palette stays a navigator.
-    if !query.isEmpty { values += actions }
+    if !query.isEmpty {
+      if !model.sample {
+        values.append(
+          PaletteResult(
+            id: "action.reclaim", title: "Reclaim space…", subtitle: "Action · preview first",
+            symbol: "sparkles", run: { model.openReclaim() }))
+      }
+      values += actions
+    }
     return values.filter {
       query.isEmpty || ($0.title + " " + $0.subtitle).localizedCaseInsensitiveContains(query)
     }
@@ -95,7 +103,8 @@ struct CommandPalette: View {
   private func choose(_ result: PaletteResult) {
     if let run = result.run {
       presented = false
-      run()
+      // Let the palette sheet dismiss before an action presents its own sheet or dialog.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { run() }
       return
     }
     guard let route = result.route else { return }

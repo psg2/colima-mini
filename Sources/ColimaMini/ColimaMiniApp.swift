@@ -14,9 +14,11 @@ import SwiftUI
           """
           Colima Mini — native macOS dashboard for the default Colima profile.
 
-          Usage: ColimaMini [--check | --scan] [--fixture SNAPSHOT_JSON]
+          Usage: ColimaMini [--check | --scan | --reclaim-plan] [--fixture SNAPSHOT_JSON]
             --check    Print a read-only JSON runtime summary without opening a window.
             --scan     Print the unused-container report without applying cleanup.
+            --reclaim-plan
+                       Print what Reclaim space would offer to remove, without removing it.
             --fixture  Read synthetic sample data; runtime actions are disabled.
             --help     Show this help.
           """)
@@ -27,9 +29,18 @@ import SwiftUI
       let dashboard = Dashboard(backend: Backend(fixture: fixture))
       dashboard.restoreLastSection()
       _model = StateObject(wrappedValue: dashboard)
-      if CommandLine.arguments.contains("--check") || CommandLine.arguments.contains("--scan") {
+      if ["--check", "--scan", "--reclaim-plan"].contains(where: CommandLine.arguments.contains) {
         Task {
           do {
+            if CommandLine.arguments.contains("--reclaim-plan") {
+              let plan = try await Backend(fixture: fixture).cleanupPlan()
+              for category in plan.categories {
+                print(
+                  "\(category.kind.title): \(category.items.count) items, \(Int(category.bytes)) bytes"
+                    + (category.kind.safeByDefault ? " (selected by default)" : ""))
+              }
+              exit(0)
+            }
             if CommandLine.arguments.contains("--scan") {
               print(try await Backend(fixture: fixture).sweep())
               exit(0)

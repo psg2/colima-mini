@@ -3,7 +3,8 @@
 - Keep the app native in SwiftUI and the runtime logic in ColimaCore.
 - Preserve the default Colima profile and explicit Docker context selection.
 - Sample mode must never run runtime or container mutations.
-- Cleanup stays report-only in the app. Preserve Docker volumes.
+- Cleanup removes only items listed in a preview, after confirmation, one ID
+  at a time and never with force. Never remove named volumes.
 - Write code, comments, documentation and PRs in English.
 - Open pull requests ready for review and explain the problem, changes,
   validation and limitations. Monitor checks and bot review comments.

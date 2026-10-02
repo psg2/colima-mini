@@ -58,6 +58,7 @@ struct DashboardView: View {
       Text(model.pending?.message ?? "")
     }
     .sheet(isPresented: $model.showingSweep) { CleanupReportView(model: model) }
+    .sheet(isPresented: $model.showingReclaim) { ReclaimView(model: model) }
     .task { await model.refresh() }
     .hidingWindowTitle()
   }

@@ -18,6 +18,8 @@ struct OverviewView: View {
               .secondary)
           }
           Spacer()
+          Button("Reclaim space…") { model.openReclaim() }
+            .disabled(model.busy || model.sample || model.snapshot?.vm.running != true)
           RefreshButton(busy: model.refreshing || model.storageLoading) {
             await model.refresh()
             await model.loadStorage()
