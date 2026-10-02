@@ -21,7 +21,7 @@ final class BackendTests: XCTestCase {
     try JSONSerialization.data(withJSONObject: object).write(to: state)
     let program = #"""
       #!/usr/bin/env python3
-      import json, os, pathlib, re, sys
+      import json, os, pathlib, re, sys, time
       path = pathlib.Path(os.environ['COLIMA_TEST_STATE'])
       data = json.loads(path.read_text())
       rows = [json.loads(line) for line in data['containers'].splitlines() if line.strip()]
@@ -58,6 +58,10 @@ final class BackendTests: XCTestCase {
                   if row['ID'] in args[1:] and row['ID'] != data.get('fail_restore'):
                       row['State'], row['Status'] = 'running', 'Up just now'
           elif args[0] == 'logs':
+              if args[-1] == 'endless':
+                  path.with_name('follower.pid').write_text(str(os.getpid()))
+                  print('2026-10-02T12:00:00Z first line', flush=True)
+                  time.sleep(60)
               print('2026-10-02T12:00:00Z stdout log', flush=True)
               print('2026-10-02T12:00:01Z stderr log', file=sys.stderr, flush=True)
               print('2026-10-02T12:00:01Z equal timestamp\nmultiline body', flush=True)
@@ -118,13 +122,27 @@ final class BackendTests: XCTestCase {
   }
   func testContainerLogsIncludeBothStreams() async throws {
     try await runtime { backend, _ in
-      let logs = try await backend.logs("sample")
+      var logs = ""
+      for try await chunk in backend.followLogs("sample") { logs += chunk }
       XCTAssertTrue(logs.contains("stdout log"))
       XCTAssertTrue(logs.contains("stderr log"))
       XCTAssertEqual(
         logs,
         "2026-10-02T12:00:00Z stdout log\n2026-10-02T12:00:01Z stderr log\n2026-10-02T12:00:01Z equal timestamp\nmultiline body\n"
       )
+    }
+  }
+  func testStoppingAFollowTerminatesTheLogProcess() async throws {
+    try await runtime { backend, config in
+      var stream = backend.followLogs("endless").makeAsyncIterator()
+      let first = try await stream.next()
+      XCTAssertEqual(first, "2026-10-02T12:00:00Z first line\n")
+      let pidFile = config.deletingLastPathComponent().appendingPathComponent("follower.pid")
+      let pid = try XCTUnwrap(Int32(String(contentsOf: pidFile, encoding: .utf8)))
+      stream = backend.followLogs("sample").makeAsyncIterator()
+      let deadline = Date().addingTimeInterval(4)
+      while kill(pid, 0) == 0 && Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+      XCTAssertNotEqual(kill(pid, 0), 0, "The follower outlived its stream")
     }
   }
   func testResourceRestartCapturesExternallyChangedRunningSet() async throws {

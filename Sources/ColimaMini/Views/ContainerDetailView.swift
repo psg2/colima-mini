@@ -68,12 +68,11 @@ struct ContainerDetailView: View {
           do { try await Task.sleep(for: .seconds(30)) } catch { return }
         } while !Task.isCancelled
       }
-      .task(id: polling) {
+      // Restarting the container ends Docker's stream; following resumes once
+      // it runs again.
+      .task(id: "\(polling):\(container?.running == true)") {
         guard polling else { return }
-        while !Task.isCancelled {
-          await model.loadLogs(id)
-          do { try await Task.sleep(for: .seconds(model.refreshInterval)) } catch { return }
-        }
+        await model.followLogs(id)
       }
       .onChange(of: logSearch) { _, search in if !search.isEmpty { follow = false } }
   }
@@ -221,19 +220,24 @@ struct ContainerDetailView: View {
         }
       }
       HStack {
-        Text(
-          model.logsPaused
-            ? "Paused"
-            : scenePhase != .active
-              ? "Paused while inactive" : "Refreshes every \(model.refreshInterval)s")
-        Text("· Last 200 lines")
+        if model.logsLive && !model.logsPaused {
+          Label("Live", systemImage: "dot.radiowaves.left.and.right").foregroundStyle(.green)
+        } else {
+          Text(
+            model.logsPaused
+              ? "Paused"
+              : scenePhase != .active
+                ? "Paused while inactive"
+                : container?.running == false ? "Container stopped" : "Connecting…")
+        }
+        Text("· Up to \(Dashboard.logLineLimit) lines, starting with the last 500")
         if model.logsLoading { ProgressView().controlSize(.small) }
         Spacer()
         if let date = model.logsDate {
-          Text("Fetched " + date.formatted(date: .omitted, time: .standard))
+          Text("Last output " + date.formatted(date: .omitted, time: .standard))
         }
       }.font(.caption).foregroundStyle(.secondary)
-      if let error = model.logError { StatusMessage(text: "Logs could not refresh. " + error) }
+      if let error = model.logError { StatusMessage(text: "Logs stopped following. " + error) }
       LogConsole(text: filteredLogs, follow: follow && logSearch.isEmpty)
         .overlay {
           if model.logs.isEmpty && !model.logsLoading {

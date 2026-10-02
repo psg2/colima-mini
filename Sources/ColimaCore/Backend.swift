@@ -101,9 +101,29 @@ package struct Backend {
     async let stats = docker(["stats", "--no-stream", "--format", "{{json .}}"])
     return try await Snapshot.decode(vm: vmOutput, containers: containers, stats: stats)
   }
-  package func logs(_ id: String) async throws -> String {
-    if let fixture { return fixture.logs?[id] ?? "No logs in this sample." }
-    return try await docker(["logs", "--timestamps", "--tail", "200", id], outputPolicy: .combined)
+  // The last 500 lines, then new output until the container stops or the
+  // consumer stops iterating.
+  package func followLogs(_ id: String) -> AsyncThrowingStream<String, Error> {
+    if let fixture {
+      let text = fixture.logs?[id] ?? "No logs in this sample."
+      return AsyncThrowingStream { continuation in
+        continuation.yield(text)
+        continuation.finish()
+      }
+    }
+    guard !id.isEmpty, !id.hasPrefix("-") else {
+      return AsyncThrowingStream {
+        $0.finish(throwing: AppError.message("The container identifier is invalid."))
+      }
+    }
+    do {
+      return Command.stream(
+        try toolchain.executable("docker"),
+        ["--context", "colima", "logs", "--follow", "--timestamps", "--tail", "500", id],
+        environment: toolchain.environment)
+    } catch {
+      return AsyncThrowingStream { $0.finish(throwing: error) }
+    }
   }
   package func sweep() async throws -> String {
     if let fixture { return fixture.sweep ?? "Nothing to clean up." }
