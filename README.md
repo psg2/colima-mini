@@ -95,8 +95,8 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
   an HTTP service, so database ports don't get an inferred browser URL.
 - Inspect named and anonymous volumes and their container mount destinations. References include
   stopped containers; an unattached volume isn't automatically safe to delete.
-- Open Storage for disk measurements and **Review unused containers**. The cleanup
-  scanner produces a report; the app never applies cleanup.
+- Open Storage for disk measurements, **Reclaim space** and **Review unused
+  containers**. The unused-container scanner only produces a report.
 - Change CPU, RAM and refresh interval in Settings.
 
 ### Diagnose a container
@@ -135,8 +135,34 @@ bytes don't promise an equal reduction in the Mac disk footprint. Volume metadat
 uses Linux mount paths; these aren't folders you can open in Finder.
 
 Storage refreshes separately from the container list. A storage read failure
-doesn't prevent container navigation or controls. The app doesn't prune Docker
-objects, remove volumes, resize VM disks or compact disk images.
+doesn't prevent container navigation or controls. Apart from Reclaim space, the
+app doesn't remove Docker objects. It never removes named volumes, resizes VM
+disks or compacts disk images.
+
+### Reclaim space
+
+**Reclaim space…** (Storage, Overview or Command+K) previews what can go:
+
+- **Selected by default:** build cache, dangling images and unused custom networks.
+- **Marked Review, selected only by you:**
+  - stopped containers;
+  - tagged images that no container uses, stopped ones included;
+  - unattached anonymous volumes.
+
+Each category lists its items and Docker's size estimate. After confirmation, the
+app removes exactly the listed items one by one, by ID and without `--force`.
+Docker refuses anything that started running or gained a container since the
+preview, and the result lists those refusals. Named volumes are never offered.
+Build cache uses `docker builder prune`, which only removes cache that isn't in use.
+Removing stopped containers can leave newly unused images or volumes; measure
+again to see them. Space freed inside the VM may not shrink the Mac disk footprint
+right away.
+
+To print the preview without opening a window:
+
+```sh
+"dist/Colima Mini.app/Contents/MacOS/ColimaMini" --reclaim-plan
+```
 
 ### Change VM resources
 
