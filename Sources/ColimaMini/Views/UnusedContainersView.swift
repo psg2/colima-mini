@@ -74,7 +74,9 @@ struct UnusedContainersView: View {
         titleVisibility: .visible
       ) {
         if let action = model.pending {
-          Button(action.label, role: .destructive) { Task { await model.perform(action) } }
+          Button(action.label, role: action.destructive ? .destructive : nil) {
+            Task { await model.perform(action) }
+          }
         }
       } message: {
         Text(model.pending?.message ?? "")

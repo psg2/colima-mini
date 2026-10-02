@@ -100,6 +100,10 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
 - Follow a whole project with **Logs** on its page, **Show logs** in its menu or
   Command+K. Each line names its service, and **Services** hides the ones you
   don't need.
+- Run Compose on a project from its menu: **Up**, **Pull images**, **Down…** and
+  **Down and delete volumes…**. Each asks first. The app reads the project's
+  folder, compose files and env files from Compose's container labels. Up and
+  pull need that folder; down also works after a worktree is deleted.
 - Inspect published port bindings and copy their addresses. TCP doesn't identify
   an HTTP service, so database ports don't get an inferred browser URL.
 - Inspect named and anonymous volumes and their container mount destinations. References include
