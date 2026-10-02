@@ -77,14 +77,7 @@ struct ContainerDetailView: View {
         }
         .help("Refresh container details").disabled(model.busy || model.detailsLoading)
         .accessibilityIdentifier("container.refresh")
-        if c.running {
-          Button {
-            Launcher.shell(c, model: model)
-          } label: {
-            Label("Shell", systemImage: "terminal")
-          }.disabled(model.sample).help("Open an interactive shell in Terminal")
-            .accessibilityIdentifier("container.shell")
-        }
+        if c.running { ShellButton(model: model, container: c) }
         if let origin = c.origin {
           OpenFolderButton(model: model, origin: origin)
         }

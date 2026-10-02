@@ -70,7 +70,8 @@ Use the sidebar to open Overview, Containers, a Compose project, Volumes, Images
 Networks, Storage or Settings. The app reopens the last page you used. Press **Command+K** to
 search loaded objects and pages. Type an action such as `restart`, `shell` or `logs`
 to act on a container. Use the arrow keys to choose a result and Return to open it.
-Settings stays aligned at the bottom and is also available with **Command+,**.
+Settings stays aligned at the bottom and is also available with **Command+,**, which
+opens a compact window with Resources, Apps and General tabs.
 
 Closing the window keeps Colima Mini in the menu bar and, by default, removes
 its Dock icon; opening the dashboard from the menu brings the icon back. Turn
@@ -120,9 +121,10 @@ The **Go** and **Container** menus list every shortcut.
   row. While some are selected, clicking a row toggles it, and the bar above the
   list starts, stops, restarts or removes the ones each action fits, after one
   confirmation. Escape clears the selection.
-- **Shell** opens `docker exec -it` in your terminal app, preferring bash. Choose
-  the terminal in Settings: Terminal, iTerm, cmux, Ghostty, Warp, WezTerm, kitty
-  or Alacritty.
+- **Shell** opens `docker exec -it` in your terminal app, preferring bash. Like
+  **Open**, its menu lists installed terminals (Terminal, iTerm, cmux, Ghostty, Warp,
+  WezTerm, kitty or Alacritty); picking one makes it the default. Settings has the
+  same choice.
 - Filter by project, search names or images, and show only running containers.
 - Start, stop and restart containers or displayed project groups, with confirmation.
 - Open a container page for Overview, Logs, Ports, Mounts and Env. Back names the
