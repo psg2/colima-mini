@@ -63,6 +63,7 @@ struct DashboardView: View {
     } message: {
       Text(model.pending?.message ?? "")
     }
+    .onExitCommand { if model.canGoBack { model.goBack() } }
     .sheet(isPresented: $model.showingSweep) { UnusedContainersView(model: model) }
     .sheet(isPresented: $model.showingReclaim) { ReclaimView(model: model) }
     .task {

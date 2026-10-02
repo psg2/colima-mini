@@ -121,8 +121,9 @@ The **Go** and **Container** menus list every shortcut.
   or Alacritty.
 - Filter by project, search names or images, and show only running containers.
 - Start, stop and restart containers or displayed project groups, with confirmation.
-- Open a container page for Overview, Logs, Ports, Mounts and Env. Use Back to return
-  to the originating list and its filters.
+- Open a container page for Overview, Logs, Ports, Mounts and Env. Back names the
+  page it returns to, with its filters; Escape and ⌘[ do the same, and clicking
+  the page's section or project in the sidebar returns to that list.
 - **Env** lists the container's environment variables. Names that usually hold
   credentials (password, secret, token, key, DSN…) and URLs with a password are
   masked until you reveal them one at a time, and a masked value can't be
@@ -167,7 +168,10 @@ when opening a web endpoint.
 
 Images shows virtual, shared and unique layer sizes and links to containers using
 an image, including stopped containers. Shared layers make summed image virtual
-sizes different from physical disk usage. The view is read-only.
+sizes different from physical disk usage. Filter to unused images and sort by size.
+**Pull latest** (row menu or image page) runs `docker pull` for the tag, and
+**Remove…** runs `docker image rm` without force on an unused image, so Docker
+refuses one any container, running or stopped, still uses.
 
 ### Understand storage measurements
 
