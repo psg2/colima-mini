@@ -92,11 +92,7 @@ struct ContainerDetailView: View {
             .accessibilityIdentifier("container.shell")
         }
         if let origin = c.origin {
-          Menu {
-            OriginMenuItems(model: model, origin: origin)
-          } label: {
-            Label("Project folder", systemImage: "folder")
-          }.fixedSize().help(origin.displayPath)
+          OpenFolderButton(model: model, origin: origin)
         }
         Button(c.running ? "Stop…" : "Start…") {
           model.request(c.running ? "stop" : "start", containers: [c])

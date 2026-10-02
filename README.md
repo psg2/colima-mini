@@ -80,7 +80,9 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
   VM capacity; row CPU follows Docker's 100% per core convention.
 - Each project shows where Compose ran it. Claude, Codex, Conductor and Orca
   worktrees are labeled, and a project whose folder was removed shows
-  **Folder missing**. Open the folder in Finder, Terminal or a detected editor.
+  **Folder missing**. **Open** sends the folder to your default app in one click;
+  its menu lists installed editors and terminals with their icons, and the one
+  you pick becomes the default. It also opens the Git remote's branch page.
 - The status bar shows container CPU and memory against the VM allocation and the
   Docker data disk. The menu bar adds per-project CPU and memory and disk use.
 - Remove a stopped container from its row, menu or page. Running containers aren't
@@ -89,7 +91,9 @@ Settings stays aligned at the bottom and is also available with **Command+,**.
 - Rows show health, uptime and published ports. Click a port to copy
   `localhost:PORT`; its menu opens HTTP or HTTPS explicitly. Hover a row for Logs,
   Shell and Restart, or right-click for every action.
-- **Shell** opens `docker exec -it` in your terminal app, preferring bash.
+- **Shell** opens `docker exec -it` in your terminal app, preferring bash. Choose
+  the terminal in Settings: Terminal, iTerm, cmux, Ghostty, Warp, WezTerm, kitty
+  or Alacritty.
 - Filter by project, search names or images, and show only running containers.
 - Start, stop and restart containers or displayed project groups, with confirmation.
 - Open a container page for Overview, Logs, Ports, Mounts and Env. Use Back to return

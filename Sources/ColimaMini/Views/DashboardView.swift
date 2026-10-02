@@ -111,6 +111,9 @@ struct ContainersView: View {
               Label("Logs", systemImage: "text.alignleft")
             }.accessibilityIdentifier("project.logs")
           }
+          if let origin = model.visible.lazy.compactMap(\.origin).first {
+            OpenFolderButton(model: model, origin: origin)
+          }
           ProjectActions(model: model, containers: model.visible)
         }
         RefreshButton(busy: model.refreshing || model.busy) { await model.refresh() }
