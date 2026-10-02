@@ -58,18 +58,12 @@ struct DashboardView: View {
       Text(model.pending?.message ?? "")
     }
     .sheet(isPresented: $model.showingSweep) { CleanupReportView(model: model) }
-    .task {
-      while !Task.isCancelled {
-        await model.refresh()
-        do {
-          try await Task.sleep(
-            for: .seconds(NSApp.isActive ? model.refreshInterval : max(30, model.refreshInterval)))
-        } catch { return }
-      }
-    }
+    .task { await model.refresh() }
+    .hidingWindowTitle()
   }
   @ViewBuilder var page: some View {
     switch model.route {
+    case .overview: OverviewView(model: model)
     case .containers: ContainersView(model: model)
     case .container(let id): ContainerDetailView(model: model, id: id).id(id)
     case .volumes: VolumesView(model: model)
@@ -139,6 +133,17 @@ struct ContainersView: View {
           .padding(.horizontal, 20).padding(.bottom, 8)
       }
       ContainerList(model: model)
+    }
+  }
+}
+
+extension View {
+  // The sidebar already names the app; the toolbar title only repeats it.
+  @ViewBuilder func hidingWindowTitle() -> some View {
+    if #available(macOS 15.0, *) {
+      toolbar(removing: .title)
+    } else {
+      self
     }
   }
 }

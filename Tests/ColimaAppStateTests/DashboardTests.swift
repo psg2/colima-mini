@@ -185,6 +185,44 @@ private actor ResultGate<Value> {
     XCTAssertNotNil(model.detailsDate)
     XCTAssertEqual(model.containers.first?.running, false)
   }
+  func testUnexpectedExitAlertsButAStopFromTheAppDoesNot() async throws {
+    let vm = #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#
+    func state(_ postgres: String, _ web: String) throws -> Snapshot {
+      try Snapshot.decode(
+        vm: vm,
+        containers: """
+          {"ID":"abc123","Names":"demo-postgres-1","Image":"postgres:18",\(postgres),"Ports":"","Labels":"com.docker.compose.project=demo"}
+          {"ID":"def456","Names":"other-web-1","Image":"web:latest",\(web),"Ports":"","Labels":"com.docker.compose.project=other"}
+          """, stats: "")
+    }
+    let up = #""State":"running","Status":"Up 1 hour""#
+    let crashed = #""State":"exited","Status":"Exited (1) 1 second ago""#
+    let killed = #""State":"exited","Status":"Exited (137) 1 second ago""#
+    var responses = [try state(up, up), try state(crashed, up), try state(crashed, killed)]
+    let model = Dashboard(backend: backend(), readSnapshot: { responses.removeFirst() })
+    model.notificationsEnabled = true
+    var received: [ContainerAlert] = []
+    model.onAlerts = { received += $0 }
+
+    await model.refresh()
+    XCTAssertTrue(received.isEmpty)
+    await model.refresh()
+    XCTAssertEqual(received.map(\.containerID), ["abc123"])
+    await model.perform(
+      PendingAction(
+        title: "Stop", message: "", verb: "stop", containers: [model.containers[1]], vm: false))
+    XCTAssertEqual(received.map(\.containerID), ["abc123"])
+    XCTAssertEqual(model.containers.last?.running, false)
+  }
+  func testReopeningTheSameContainerKeepsOneBackStep() async throws {
+    let model = Dashboard(backend: backend())
+    model.navigate(.volumes)
+    model.openContainer("abc123")
+    model.openContainer("abc123", tab: .logs)
+    XCTAssertEqual(model.containerTab, .logs)
+    model.goBack()
+    XCTAssertEqual(model.route, .volumes)
+  }
   func testPageCancellationDoesNotLoseSharedVolumeInventory() async throws {
     let gate = ResultGate<[Volume]>()
     let model = Dashboard(backend: backend(), readVolumes: { try await gate.read() })

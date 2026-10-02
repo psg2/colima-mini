@@ -6,9 +6,13 @@ import SwiftUI
 
 // The same long ears, muzzle and neck as the application logo, reduced to a
 // template silhouette so macOS supplies the correct menu bar foreground color.
-let llamaMenuIcon: NSImage = {
+let llamaMenuIcon = llamaIcon(alpha: 1)
+// A stopped VM keeps the silhouette at reduced opacity; template images keep alpha.
+let llamaMenuIconDimmed = llamaIcon(alpha: 0.4)
+
+private func llamaIcon(alpha: CGFloat) -> NSImage {
   let image = NSImage(size: NSSize(width: 20, height: 20), flipped: true) { _ in
-    NSColor.black.setFill()
+    NSColor.black.withAlphaComponent(alpha).setFill()
     let head = NSBezierPath()
     let points: [NSPoint] = [
       NSPoint(x: 4, y: 19), NSPoint(x: 5, y: 10), NSPoint(x: 7, y: 7),
@@ -27,4 +31,4 @@ let llamaMenuIcon: NSImage = {
   }
   image.isTemplate = true
   return image
-}()
+}

@@ -3,6 +3,7 @@ import ColimaAppState
 import ColimaCore
 import Combine
 import Foundation
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -12,6 +13,25 @@ struct SettingsView: View {
   @State private var saved: ResourceSettings?
   @State private var error: String?
   @State private var confirming = false
+  @State private var loginEnabled = SMAppService.mainApp.status == .enabled
+  @State private var loginError: String?
+  private var loginItem: Binding<Bool> {
+    Binding(
+      get: { loginEnabled },
+      set: { enabled in
+        do {
+          if enabled {
+            try SMAppService.mainApp.register()
+          } else {
+            try SMAppService.mainApp.unregister()
+          }
+          loginError = nil
+        } catch {
+          loginError = "Could not change the login item: " + error.localizedDescription
+        }
+        loginEnabled = SMAppService.mainApp.status == .enabled
+      })
+  }
   var proposed: ResourceSettings { ResourceSettings(cpus: Int(cpus), memoryGiB: memory) }
   var changed: Bool { saved != nil && proposed != saved }
   var differsFromVM: Bool {
@@ -123,12 +143,28 @@ struct SettingsView: View {
         }
       }
       GroupBox("Dashboard") {
-        HStack {
-          Text("Refresh interval")
-          Spacer()
-          Picker("Refresh interval", selection: $model.refreshInterval) {
-            ForEach([5, 10, 30, 60], id: \.self) { Text("\($0) seconds").tag($0) }
-          }.labelsHidden().frame(width: 150)
+        VStack(alignment: .leading, spacing: 12) {
+          HStack {
+            Text("Refresh interval")
+            Spacer()
+            Picker("Refresh interval", selection: $model.refreshInterval) {
+              ForEach([5, 10, 30, 60], id: \.self) { Text("\($0) seconds").tag($0) }
+            }.labelsHidden().frame(width: 150)
+          }
+          Text("While another app is in front, refreshes happen at most every 30 seconds.")
+            .font(.caption).foregroundStyle(.secondary)
+          Divider()
+          Toggle("Notify when a container fails", isOn: $model.notificationsEnabled)
+            .disabled(model.sample).accessibilityIdentifier("settings.notifications")
+          Text(
+            "Unexpected exits, failing health checks and restart loops. Changes made from Colima Mini don't notify."
+          ).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+          Divider()
+          Toggle("Open at login", isOn: loginItem).disabled(model.sample)
+            .accessibilityIdentifier("settings.login")
+          if let loginError {
+            Text(loginError).font(.caption).foregroundStyle(.orange)
+          }
         }.padding(10)
       }
       Text("Context: colima · CPU and memory changes stay in your local Colima profile.")
@@ -136,6 +172,10 @@ struct SettingsView: View {
     }.padding(24).frame(width: 570)
       .onAppear { load() }
       .onChange(of: model.refreshInterval) { _, _ in model.savePreferences() }
+      .onChange(of: model.notificationsEnabled) { _, enabled in
+        model.savePreferences()
+        if enabled { Notifier.shared.requestAuthorization() }
+      }
       .confirmationDialog(
         "Apply resource changes?", isPresented: $confirming, titleVisibility: .visible
       ) {

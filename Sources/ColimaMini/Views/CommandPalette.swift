@@ -6,8 +6,9 @@ private struct PaletteResult: Identifiable {
   let title: String
   let subtitle: String
   let symbol: String
-  let route: AppRoute
+  var route: AppRoute? = nil
   var project: String? = nil
+  var run: (() -> Void)? = nil
 }
 struct CommandPalette: View {
   @ObservedObject var model: Dashboard
@@ -17,7 +18,8 @@ struct CommandPalette: View {
   @FocusState private var focused: Bool
   private var results: [PaletteResult] {
     var values = [
-      ("Containers", AppRoute.containers), ("Volumes", .volumes), ("Images", .images),
+      ("Overview", AppRoute.overview), ("Containers", .containers), ("Volumes", .volumes),
+      ("Images", .images),
       ("Storage", .storage), ("Settings", .settings),
     ].map {
       PaletteResult(
@@ -44,19 +46,66 @@ struct CommandPalette: View {
         id: "image." + $0.id, title: $0.name, subtitle: "Image", symbol: "square.3.layers.3d",
         route: .image($0.id))
     }
+    // Actions appear once the user types, so the empty palette stays a navigator.
+    if !query.isEmpty { values += actions }
     return values.filter {
       query.isEmpty || ($0.title + " " + $0.subtitle).localizedCaseInsensitiveContains(query)
     }
   }
+  private var actions: [PaletteResult] {
+    model.containers.flatMap { container -> [PaletteResult] in
+      var items = [
+        PaletteResult(
+          id: "logs." + container.id, title: "Show logs: " + container.name,
+          subtitle: "Action", symbol: "text.alignleft",
+          run: { model.openContainer(container.id, tab: .logs) })
+      ]
+      guard !model.sample else { return items }
+      if container.running {
+        items += [
+          PaletteResult(
+            id: "shell." + container.id, title: "Open shell: " + container.name,
+            subtitle: "Action", symbol: "terminal",
+            run: { Launcher.shell(container, model: model) }),
+          PaletteResult(
+            id: "restart." + container.id, title: "Restart: " + container.name,
+            subtitle: "Action · asks first", symbol: "arrow.clockwise",
+            run: { model.request("restart", containers: [container]) }),
+          PaletteResult(
+            id: "stop." + container.id, title: "Stop: " + container.name,
+            subtitle: "Action · asks first", symbol: "stop",
+            run: { model.request("stop", containers: [container]) }),
+        ]
+      } else {
+        items.append(
+          PaletteResult(
+            id: "start." + container.id, title: "Start: " + container.name,
+            subtitle: "Action · asks first", symbol: "play",
+            run: { model.request("start", containers: [container]) }))
+      }
+      items += container.publishedPorts.map { port in
+        PaletteResult(
+          id: "port." + container.id + port.id, title: "Copy \(port.address): " + container.name,
+          subtitle: "Port \(port.label)", symbol: "network",
+          run: { Launcher.copy(port.address) })
+      }
+      return items
+    }
+  }
   private func choose(_ result: PaletteResult) {
-    switch result.route {
+    if let run = result.run {
+      presented = false
+      run()
+      return
+    }
+    guard let route = result.route else { return }
+    switch route {
     case .container(let id): model.openContainer(id)
     case .volume(let name): model.openVolume(name)
     case .image(let id): model.openImage(id)
     default:
       model.navigate(
-        result.route,
-        project: result.route == .containers ? result.project ?? "All containers" : nil)
+        route, project: route == .containers ? result.project ?? "All containers" : nil)
     }
     presented = false
   }
@@ -69,7 +118,7 @@ struct CommandPalette: View {
     VStack(alignment: .leading, spacing: 14) {
       HStack {
         Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-        TextField("Search containers, projects, volumes or images", text: $query)
+        TextField("Search or type an action, such as restart or shell", text: $query)
           .textFieldStyle(.plain).focused($focused).accessibilityIdentifier("palette.search")
           .onSubmit {
             if let result = results.first(where: { $0.id == selected }) ?? results.first {

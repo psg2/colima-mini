@@ -10,6 +10,19 @@ struct ProjectActions: View {
   let containers: [Container]
   var body: some View {
     Menu {
+      Self.items(model: model, containers: containers)
+      if let origin = containers.lazy.compactMap(\.origin).first {
+        Divider()
+        OriginMenuItems(model: model, origin: origin)
+      }
+    } label: {
+      Image(systemName: "ellipsis")
+    }
+    .menuStyle(.borderlessButton).fixedSize().help("Project actions")
+    .disabled(model.busy || containers.isEmpty)
+  }
+  @ViewBuilder static func items(model: Dashboard, containers: [Container]) -> some View {
+    Group {
       Button("Start containers") {
         model.request("start", containers: containers.filter { !$0.running })
       }
@@ -20,14 +33,6 @@ struct ProjectActions: View {
         model.request("restart", containers: containers.filter(\.running))
       }
       .disabled(!containers.contains(where: \.running))
-      if let folder = containers.compactMap(\.folder).first {
-        Divider()
-        Button("Open project folder") { NSWorkspace.shared.open(folder) }
-      }
-    } label: {
-      Image(systemName: "ellipsis")
-    }
-    .menuStyle(.borderlessButton).fixedSize().help("Project actions")
-    .disabled(model.busy || model.sample || containers.isEmpty)
+    }.disabled(model.sample)
   }
 }

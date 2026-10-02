@@ -9,6 +9,8 @@ struct VolumesView: View {
       (model.volumeSearch.isEmpty
         || ($0.name + " " + ($0.project ?? "")).localizedCaseInsensitiveContains(model.volumeSearch))
         && (!model.unattachedOnly || $0.attached == false)
+        && (model.volumeKind == .all
+          || $0.anonymous == (model.volumeKind == .anonymous))
     }.sorted {
       model.volumeSortBySize
         ? ($0.sizeBytes ?? -1) > ($1.sizeBytes ?? -1)
@@ -29,6 +31,10 @@ struct VolumesView: View {
       HStack {
         TextField("Filter volumes or projects", text: $model.volumeSearch).textFieldStyle(
           .roundedBorder)
+        Picker("Kind", selection: $model.volumeKind) {
+          ForEach(VolumeKind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+        }.pickerStyle(.segmented).labelsHidden().fixedSize()
+          .help("Docker creates anonymous volumes for unnamed mounts, such as an image's VOLUME.")
         Toggle("Unattached only", isOn: $model.unattachedOnly).toggleStyle(.checkbox)
         Picker("Sort", selection: $model.volumeSortBySize) {
           Text("Name").tag(false)
@@ -36,6 +42,7 @@ struct VolumesView: View {
         }
         .frame(width: 130)
       }
+      summary
       Text(
         "Unattached volumes have no container references. Their data may still be important; stopped containers also count as references."
       )
@@ -65,6 +72,19 @@ struct VolumesView: View {
     }.padding(24).task { await model.loadVolumes() }
   }
 }
+extension VolumesView {
+  @ViewBuilder fileprivate var summary: some View {
+    let anonymous = model.volumes.filter { $0.anonymous == true }
+    let loose = anonymous.filter { $0.attached == false }
+    if !anonymous.isEmpty {
+      Text(
+        "\(countText(anonymous.count, "anonymous volume")) · \(loose.count) unattached, "
+          + bytesText(loose.compactMap(\.sizeBytes).reduce(0, +))
+      ).font(.caption).monospacedDigit()
+    }
+  }
+}
+
 struct VolumeDetailView: View {
   @ObservedObject var model: Dashboard
   let name: String
@@ -170,6 +190,9 @@ private struct VolumeRow: View {
   private var subtitle: String {
     var pieces = [volume.driver]
     if let project = volume.project { pieces.insert(project, at: 0) }
+    if volume.anonymous == true, let user = volume.references.first {
+      pieces.insert(user.containerName, at: 0)
+    }
     pieces.append(
       volume.referencesAvailable
         ? countText(volume.references.count, "container reference") : "Reference data unavailable")
@@ -187,7 +210,15 @@ private struct VolumeRow: View {
       HStack(spacing: 12) {
         Image(systemName: "externaldrive").foregroundStyle(.secondary)
         VStack(alignment: .leading, spacing: 5) {
-          Text(volume.name).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
+          if volume.anonymous == true {
+            HStack(spacing: 6) {
+              Text("Anonymous").fontWeight(.medium)
+              Text(volume.name.prefix(12)).font(.system(.callout, design: .monospaced))
+                .foregroundStyle(.secondary)
+            }.help(volume.name)
+          } else {
+            Text(volume.name).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
+          }
           Text(subtitle).font(.caption).foregroundStyle(.secondary)
         }
         Spacer()
