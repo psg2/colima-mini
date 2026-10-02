@@ -59,7 +59,7 @@ extension Backend {
     async let accounting = captured { try await self.accounting() }
     async let metadata = captured {
       let format =
-        #"{"Name":{{json .Name}},"Driver":{{json .Driver}},"Mountpoint":{{json .Mountpoint}},"CreatedAt":{{json .CreatedAt}},"Labels":{"com.docker.compose.project":{{json (index .Labels "com.docker.compose.project")}}}}"#
+        #"{"Name":{{json .Name}},"Driver":{{json .Driver}},"Mountpoint":{{json .Mountpoint}},"CreatedAt":{{json .CreatedAt}},"Labels":{{json .Labels}}}"#
       var all: [VolumeMetadata] = []
       let names = rows.map(\.name)
       for offset in stride(from: 0, to: names.count, by: 100) {
@@ -100,7 +100,8 @@ extension Backend {
         },
         mountpoint: meta?.mountpoint, createdAt: meta?.createdAt, sizeBytes: size,
         references: references, referencesAvailable: completeReferences,
-        dataIssue: issue.isEmpty ? nil : issue)
+        dataIssue: issue.isEmpty ? nil : issue,
+        anonymous: meta.map { $0.labels?.keys.contains("com.docker.volume.anonymous") == true })
     }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
   }
 
