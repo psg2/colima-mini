@@ -103,6 +103,8 @@ package struct PendingAction: Identifiable {
   @Published package var reclaiming = false
   @Published package var showingReclaim = false
   @Published package var showingPalette = false
+  // Containers checked for a bulk action, by ID.
+  @Published package var checked: Set<String> = []
   // Bumped by Find (⌘F); the visible filter field takes focus.
   @Published package var findRequest = 0
   @Published package var history: [String: [MetricSample]] = [:]
@@ -149,6 +151,10 @@ package struct PendingAction: Identifiable {
   package var sample: Bool { backend.fixture != nil }
   package var containers: [Container] { snapshot?.containers ?? [] }
   package var selected: Container? { containers.first { $0.id == selectedID } }
+  package var checkedContainers: [Container] { containers.filter { checked.contains($0.id) } }
+  package func toggleChecked(_ id: String) {
+    if checked.contains(id) { checked.remove(id) } else { checked.insert(id) }
+  }
   package var canGoBack: Bool {
     switch route {
     case .container, .projectLogs, .volume, .image: return true
@@ -536,6 +542,7 @@ package struct PendingAction: Identifiable {
     pending = nil
     let now = Date()
     for container in action.vm ? containers : action.containers { actedOn[container.id] = now }
+    checked.subtract(action.containers.map(\.id))
     var actionError: String?
     do {
       if let compose = action.compose, let first = action.containers.first {

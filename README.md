@@ -109,6 +109,10 @@ The **Go** and **Container** menus list every shortcut.
 - Rows show health, uptime and published ports. Click a port to copy
   `localhost:PORT`; its menu opens HTTP or HTTPS explicitly. Hover a row for Logs,
   Shell and Restart, or right-click for every action.
+- Select several containers with the circle that appears on hover, or ⌘-click a
+  row. While some are selected, clicking a row toggles it, and the bar above the
+  list starts, stops, restarts or removes the ones each action fits, after one
+  confirmation. Escape clears the selection.
 - **Shell** opens `docker exec -it` in your terminal app, preferring bash. Choose
   the terminal in Settings: Terminal, iTerm, cmux, Ghostty, Warp, WezTerm, kitty
   or Alacritty.

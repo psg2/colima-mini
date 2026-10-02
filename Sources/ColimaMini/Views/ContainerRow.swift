@@ -11,9 +11,22 @@ struct ContainerRow: View {
   let showProject: Bool
   @State private var hovering = false
   var body: some View {
+    let isChecked = model.checked.contains(container.id)
     HStack(spacing: 12) {
-      Image(systemName: container.needsAttention ? "exclamationmark.triangle" : "shippingbox")
-        .foregroundStyle(container.needsAttention ? Color.orange : Color.secondary)
+      if hovering || !model.checked.isEmpty {
+        Button {
+          model.toggleChecked(container.id)
+        } label: {
+          Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isChecked ? Color.accentColor : Color.secondary)
+            .frame(width: 18)
+        }.buttonStyle(.plain).help(isChecked ? "Deselect" : "Select for a bulk action (⌘-click)")
+          .accessibilityLabel(isChecked ? "Deselect \(container.name)" : "Select \(container.name)")
+      } else {
+        Image(systemName: container.needsAttention ? "exclamationmark.triangle" : "shippingbox")
+          .foregroundStyle(container.needsAttention ? Color.orange : Color.secondary)
+          .frame(width: 18)
+      }
       VStack(alignment: .leading, spacing: 4) {
         HStack(spacing: 8) {
           Text(container.service).fontWeight(.medium).lineLimit(1)
@@ -40,13 +53,23 @@ struct ContainerRow: View {
     }.padding(.horizontal, 12).padding(.vertical, 9)
       .contentShape(Rectangle())
       .background(
-        model.selectedID == container.id
+        model.selectedID == container.id || isChecked
           ? Color.accentColor.opacity(0.18)
           : hovering ? Color.primary.opacity(0.04) : Color.clear
       )
       .clipShape(RoundedRectangle(cornerRadius: 7))
       .onHover { hovering = $0 }
-      .onTapGesture { model.openContainer(container.id) }
+      .gesture(
+        TapGesture().modifiers(.command).onEnded { model.toggleChecked(container.id) }
+          .exclusively(
+            before: TapGesture().onEnded {
+              if model.checked.isEmpty {
+                model.openContainer(container.id)
+              } else {
+                model.toggleChecked(container.id)
+              }
+            })
+      )
       .contextMenu { ContainerMenuItems(model: model, container: container) }
       .help(container.name + " · " + container.status)
       .accessibilityElement(children: .contain)

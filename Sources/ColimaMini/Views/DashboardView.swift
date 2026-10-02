@@ -156,6 +156,9 @@ struct ContainersView: View {
           )
           .padding(.horizontal, 20).padding(.bottom, 8)
       }
+      if !model.checkedContainers.isEmpty {
+        BulkActionBar(model: model).padding(.horizontal, 20).padding(.bottom, 8)
+      }
       ContainerList(model: model)
     }
   }
