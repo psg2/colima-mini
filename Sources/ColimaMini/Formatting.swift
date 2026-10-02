@@ -1,3 +1,4 @@
+import ColimaCore
 import Foundation
 
 func memoryText(_ bytes: Double) -> String {
@@ -19,4 +20,11 @@ func bytesText(_ bytes: Double?) -> String {
 
 func countText(_ count: Int, _ singular: String) -> String {
   "\(count) " + singular + (count == 1 ? "" : "s")
+}
+
+// "Oct 1, 2026 at 16:29 · 25 hours ago" from a Docker timestamp.
+func timestampText(_ raw: String?, empty: String = "Unavailable") -> String {
+  guard let date = DockerDate.parse(raw) else { return raw.map { _ in "Never" } ?? empty }
+  let relative = RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date())
+  return date.formatted(date: .abbreviated, time: .shortened) + " · " + relative
 }

@@ -113,7 +113,11 @@ struct VolumeDetailView: View {
         Grid(alignment: .leading, horizontalSpacing: 30, verticalSpacing: 14) {
           GridRow {
             Text("Project").foregroundStyle(.secondary)
-            Text(volume.project ?? "No project label")
+            if let project = volume.project {
+              Button(project) { model.navigate(.containers, project: project) }.buttonStyle(.link)
+            } else {
+              Text("No project label")
+            }
           }
           GridRow {
             Text("Use").foregroundStyle(.secondary)
@@ -123,7 +127,7 @@ struct VolumeDetailView: View {
           }
           GridRow {
             Text("Created").foregroundStyle(.secondary)
-            Text(volume.createdAt ?? "Unavailable")
+            Text(timestampText(volume.createdAt))
           }
           if let mountpoint = volume.mountpoint {
             GridRow {
