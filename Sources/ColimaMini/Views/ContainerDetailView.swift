@@ -125,7 +125,15 @@ struct ContainerDetailView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
         HStack(spacing: 12) {
-          relationship("Project", c.project)
+          if c.project == "Standalone" {
+            relationship("Project", c.project)
+          } else {
+            Button {
+              model.navigate(.containers, project: c.project)
+            } label: {
+              relationship("Project", c.project)
+            }.buttonStyle(.plain).help("Open the \(c.project) project")
+          }
           Image(systemName: "chevron.right").foregroundStyle(.tertiary)
           relationship("Service", c.service)
           if let mount = currentDetails?.mounts.first(where: { $0.type == "volume" }),
@@ -149,7 +157,10 @@ struct ContainerDetailView: View {
             fact("Exit code", details.state.exitCode.map(String.init) ?? "Unavailable")
             fact("OOM killed", details.state.oomKilled.map { $0 ? "Yes" : "No" } ?? "Unavailable")
             fact("Restart count", details.restartCount.map(String.init) ?? "Unavailable")
-            fact("Started", details.state.startedAt ?? "Unavailable")
+            fact("Started", timestampText(details.state.startedAt))
+            if details.state.running != true {
+              fact("Finished", timestampText(details.state.finishedAt))
+            }
             if let error = details.state.error, !error.isEmpty { fact("Runtime error", error) }
           }.textSelection(.enabled)
         }
