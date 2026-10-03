@@ -130,9 +130,9 @@ struct ContainersView: View {
             Task { await model.scan() }
           } label: {
             if orphaned.isEmpty {
-              Text("Review unused…")
+              Text("Review unused containers")
             } else {
-              Label("Review unused…", systemImage: "folder.badge.questionmark")
+              Label("Review unused containers", systemImage: "folder.badge.questionmark")
             }
           }
           .disabled(model.scanning || model.busy || model.snapshot?.vm.running != true)

@@ -66,7 +66,7 @@ Confirm that the dashboard opens and reports the default Colima profile.
 
 ## Use
 
-Use the sidebar to open Overview, Containers, a Compose project, Volumes, Images,
+Use the sidebar to open Overview, Containers, a Compose project, Images, Volumes,
 Networks, Storage or Settings. The app reopens the last page you used. Press **Command+K** to
 search loaded objects and pages. Type an action such as `restart`, `shell` or `logs`
 to act on a container. Use the arrow keys to choose a result and Return to open it.
@@ -83,7 +83,7 @@ The **Go** and **Container** menus list every shortcut.
 
 | Keys | Action |
 | --- | --- |
-| ⌘1 … ⌘6 | Overview, Containers, Volumes, Images, Networks, Storage |
+| ⌘1 … ⌘6 | Overview, Containers, Images, Volumes, Networks, Storage |
 | ⌘K | Search and actions |
 | ⌘F | Focus the filter or log search on the current page |
 | ⌘[ | Back |
