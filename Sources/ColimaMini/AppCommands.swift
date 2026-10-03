@@ -14,8 +14,8 @@ struct AppCommands: Commands {
       Button("Overview") { model.navigate(.overview) }.keyboardShortcut("1")
       Button("Containers") { model.navigate(.containers, project: "All containers") }
         .keyboardShortcut("2")
-      Button("Volumes") { model.navigate(.volumes) }.keyboardShortcut("3")
-      Button("Images") { model.navigate(.images) }.keyboardShortcut("4")
+      Button("Images") { model.navigate(.images) }.keyboardShortcut("3")
+      Button("Volumes") { model.navigate(.volumes) }.keyboardShortcut("4")
       Button("Networks") { model.navigate(.networks) }.keyboardShortcut("5")
       Button("Storage") { model.navigate(.storage) }.keyboardShortcut("6")
       Divider()

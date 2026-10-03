@@ -18,8 +18,8 @@ struct CommandPalette: View {
   @FocusState private var focused: Bool
   private var results: [PaletteResult] {
     var values = [
-      ("Overview", AppRoute.overview), ("Containers", .containers), ("Volumes", .volumes),
-      ("Images", .images), ("Networks", .networks),
+      ("Overview", AppRoute.overview), ("Containers", .containers), ("Images", .images),
+      ("Volumes", .volumes), ("Networks", .networks),
       ("Storage", .storage), ("Settings", .settings),
     ].map {
       PaletteResult(

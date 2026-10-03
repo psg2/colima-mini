@@ -45,15 +45,14 @@ struct SidebarView: View {
             .accessibilityIdentifier(vm.running ? "vm.stop" : "vm.start")
           }
         }.font(.callout)
-        Text(model.snapshot?.vm.allocation ?? "Default profile").font(.caption).foregroundStyle(
-          .secondary)
+          .help(model.snapshot?.vm.allocation ?? "Default profile")
       }.padding(20)
       List(selection: selection) {
         navigationRow("Overview", symbol: "gauge.with.dots.needle.33percent", route: .overview)
         navigationRow(
           "Containers", symbol: "shippingbox", route: .containers, count: model.containers.count)
-        navigationRow("Volumes", symbol: "externaldrive", route: .volumes)
         navigationRow("Images", symbol: "square.3.layers.3d", route: .images)
+        navigationRow("Volumes", symbol: "externaldrive", route: .volumes)
         navigationRow(
           "Networks", symbol: "point.3.connected.trianglepath.dotted", route: .networks)
         navigationRow("Storage", symbol: "chart.pie", route: .storage)
