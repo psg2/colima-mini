@@ -57,8 +57,8 @@ profile directory.
 
 ## Tests
 
-CI runs `mise run ci` on macOS 26, `mise run test` on macOS 15 with Apple
-Silicon and Intel, and a Gitleaks scan on Linux. All targets compile with
+CI runs `mise run ci` on macOS 26, `mise run test` on macOS 14 (Apple Silicon)
+and macOS 15 (Intel), and a Gitleaks scan on Linux. All targets compile with
 warnings treated as errors. Hosted runners can't run a nested Colima VM, so runtime
 tests use fake `docker` and `colima` executables. Restarting a real VM, clicking
 through the UI and networking still need a manual check on a Mac with Colima. The

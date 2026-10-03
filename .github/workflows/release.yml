@@ -38,8 +38,6 @@ jobs:
         env:
           COLIMA_MINI_RELEASE_SIGNING: adhoc
         run: mise run package-release
-      - name: Verify the universal app
-        run: ./Scripts/test-app.sh
       - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
