@@ -4,6 +4,11 @@ import SwiftUI
 
 struct VolumesView: View {
   @ObservedObject var model: Dashboard
+  @State private var selection: Set<String> = []
+  @State private var confirmingBulk = false
+  private var selected: [Volume] {
+    model.volumes.filter { selection.contains($0.name) && $0.attached == false }
+  }
   var visible: [Volume] {
     model.volumes.filter {
       (model.volumeSearch.isEmpty
@@ -52,6 +57,16 @@ struct VolumesView: View {
       )
       .font(.caption).foregroundStyle(.secondary)
       if let error = model.volumesError { StatusMessage(text: error) }
+      if !selected.isEmpty {
+        let candidates = visible.filter { $0.attached == false }
+        RemovalBar(
+          count: selected.count, noun: "volume",
+          bytes: selected.compactMap(\.sizeBytes).reduce(0, +), bytesNote: "of data",
+          disabled: model.busy || model.sample,
+          selectAll: candidates.allSatisfy { selection.contains($0.name) }
+            ? nil : { selection.formUnion(candidates.map(\.name)) },
+          clear: { selection.removeAll() }, remove: { confirmingBulk = true })
+      }
       if model.volumesLoading { ProgressView().controlSize(.small) }
       if visible.isEmpty && !model.volumesLoading {
         EmptyPage(
@@ -63,7 +78,17 @@ struct VolumesView: View {
         ScrollView {
           LazyVStack(spacing: 1) {
             ForEach(visible) { volume in
-              VolumeRow(volume: volume) { model.openVolume(volume.name) }
+              VolumeRow(
+                volume: volume, selected: selection.contains(volume.name),
+                selecting: !selection.isEmpty,
+                toggle: {
+                  if selection.contains(volume.name) {
+                    selection.remove(volume.name)
+                  } else {
+                    selection.insert(volume.name)
+                  }
+                }
+              ) { model.openVolume(volume.name) }
               Divider()
             }
           }
@@ -74,6 +99,23 @@ struct VolumesView: View {
           .foregroundStyle(.secondary)
       }
     }.padding(24).task { await model.loadVolumes() }
+      .confirmationDialog(
+        "Delete \(countText(selected.count, "volume")) and their data?",
+        isPresented: $confirmingBulk, titleVisibility: .visible
+      ) {
+        Button("Delete volumes and data", role: .destructive) {
+          let names = selected.map(\.name)
+          selection.removeAll()
+          Task { await model.removeVolumes(names) }
+        }
+      } message: {
+        Text(
+          selected.map { $0.anonymous == true ? "Anonymous " + $0.name.prefix(12) : $0.name }
+            .prefix(8).joined(separator: "\n")
+            + (selected.count > 8 ? "\n…and \(selected.count - 8) more" : "")
+            + "\n\nDeletes \(bytesText(selected.compactMap(\.sizeBytes).reduce(0, +))) of data inside Colima. This can't be undone. Docker refuses any volume a container references."
+        )
+      }
   }
 }
 extension VolumesView {
@@ -211,7 +253,12 @@ struct VolumeDetailView: View {
 
 private struct VolumeRow: View {
   let volume: Volume
+  let selected: Bool
+  let selecting: Bool
+  let toggle: () -> Void
   let open: () -> Void
+  @State private var hovering = false
+  private var removable: Bool { volume.attached == false }
   private var subtitle: String {
     var pieces = [volume.driver]
     if let project = volume.project { pieces.insert(project, at: 0) }
@@ -231,26 +278,44 @@ private struct VolumeRow: View {
     }
   }
   var body: some View {
-    Button(action: open) {
-      HStack(spacing: 12) {
-        Image(systemName: "externaldrive").foregroundStyle(.secondary)
-        VStack(alignment: .leading, spacing: 5) {
-          if volume.anonymous == true {
-            HStack(spacing: 6) {
-              Text("Anonymous").fontWeight(.medium)
-              Text(volume.name.prefix(12)).font(.system(.callout, design: .monospaced))
-                .foregroundStyle(.secondary)
-            }.help(volume.name)
-          } else {
-            Text(volume.name).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
-          }
-          Text(subtitle).font(.caption).foregroundStyle(.secondary)
+    HStack(spacing: 12) {
+      SelectionMark(
+        name: volume.name, selectable: removable, selected: selected, selecting: selecting,
+        hovering: hovering, toggle: toggle
+      ) {
+        Image(systemName: "externaldrive").foregroundStyle(.secondary).frame(width: 22)
+      }
+      VStack(alignment: .leading, spacing: 5) {
+        if volume.anonymous == true {
+          HStack(spacing: 6) {
+            Text("Anonymous").fontWeight(.medium)
+            Text(volume.name.prefix(12)).font(.system(.callout, design: .monospaced))
+              .foregroundStyle(.secondary)
+          }.help(volume.name)
+        } else {
+          Text(volume.name).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
         }
-        Spacer()
-        Text(useDescription).font(.caption).foregroundStyle(.secondary)
-        Text(bytesText(volume.sizeBytes)).monospacedDigit().frame(width: 95, alignment: .trailing)
-        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
-      }.padding(12).contentShape(Rectangle())
-    }.buttonStyle(.plain).accessibilityIdentifier("volume.row." + volume.name)
+        Text(subtitle).font(.caption).foregroundStyle(.secondary)
+      }
+      Spacer()
+      Text(useDescription).font(.caption).foregroundStyle(.secondary)
+      Text(bytesText(volume.sizeBytes)).monospacedDigit().frame(width: 95, alignment: .trailing)
+      Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+    }.padding(12).contentShape(Rectangle())
+      .background(
+        selected ? Color.accentColor.opacity(0.18) : Color.clear,
+        in: RoundedRectangle(cornerRadius: 7)
+      )
+      .onHover { hovering = $0 }
+      .gesture(
+        TapGesture().modifiers(.command).onEnded { if removable { toggle() } }
+          .exclusively(
+            before: TapGesture().onEnded {
+              if selecting && removable { toggle() } else { open() }
+            })
+      )
+      .accessibilityElement(children: .combine).accessibilityAddTraits(.isButton)
+      .accessibilityAction { open() }
+      .accessibilityIdentifier("volume.row." + volume.name)
   }
 }

@@ -459,16 +459,23 @@ package struct PendingAction: Identifiable {
   }
   // Returns whether Docker removed it; the volume list is measured again.
   @discardableResult package func removeVolume(_ name: String) async -> Bool {
-    guard !busy, !sample else { return false }
+    await removeVolumes([name]).contains(name)
+  }
+  // Returns the names Docker removed; refusals are reported after the reload.
+  @discardableResult package func removeVolumes(_ names: [String]) async -> [String] {
+    guard !busy, !sample, !names.isEmpty else { return [] }
     busy = true
-    var removed = false
-    do {
-      try await backend.removeVolume(name)
-      volumesError = nil
-      removed = true
-    } catch { volumesError = "Could not remove \(name): " + error.localizedDescription }
+    var removed: [String] = []
+    var failures: [String] = []
+    for name in names {
+      do {
+        try await backend.removeVolume(name)
+        removed.append(name)
+      } catch { failures.append(name + ": " + error.localizedDescription) }
+    }
     busy = false
     await loadVolumes()
+    if !failures.isEmpty { volumesError = "Could not remove " + failures.joined(separator: "; ") }
     return removed
   }
   package func loadVolumes() async {
@@ -487,23 +494,38 @@ package struct PendingAction: Identifiable {
   }
   // Pull or remove one image, then measure images again.
   package func changeImage(_ image: DockerImage, pull: Bool) async {
+    guard pull else { return await removeImages([image]) }
     guard !busy, !sample else { return }
     busy = true
-    imageActivity = (pull ? "Pulling " : "Removing ") + image.name + "…"
-    do {
-      if pull {
-        try await backend.pullImage(image)
-      } else {
-        try await backend.removeImage(image)
-      }
-      imagesError = nil
-    } catch {
-      imagesError =
-        "Could not \(pull ? "pull" : "remove") \(image.name): " + error.localizedDescription
+    imageActivity = "Pulling " + image.name + "…"
+    var failure: String?
+    do { try await backend.pullImage(image) } catch {
+      failure = "Could not pull \(image.name): " + error.localizedDescription
     }
     imageActivity = nil
     busy = false
     await loadImages()
+    if let failure { imagesError = failure }
+  }
+  // Removes one by one without force, so Docker refuses an image a container
+  // started using since; the others still go. Refusals are reported after the
+  // reload, which would otherwise clear them.
+  package func removeImages(_ targets: [DockerImage]) async {
+    guard !busy, !sample, !targets.isEmpty else { return }
+    busy = true
+    var failures: [String] = []
+    for (index, image) in targets.enumerated() {
+      imageActivity =
+        targets.count == 1
+        ? "Removing \(image.name)…" : "Removing \(index + 1) of \(targets.count)…"
+      do { try await backend.removeImage(image) } catch {
+        failures.append(image.name + ": " + error.localizedDescription)
+      }
+    }
+    imageActivity = nil
+    busy = false
+    await loadImages()
+    if !failures.isEmpty { imagesError = "Could not remove " + failures.joined(separator: "; ") }
   }
   package func loadImages() async {
     guard !imagesLoading else { return }
