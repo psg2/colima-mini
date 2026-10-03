@@ -136,7 +136,8 @@ struct OverviewView: View {
         meter(
           "Docker data disk",
           bytesText(Double(filesystem.usedBytes)) + " / " + bytesText(Double(filesystem.sizeBytes)),
-          Double(filesystem.usedBytes) / Double(filesystem.sizeBytes), .purple)
+          Double(filesystem.usedBytes) / Double(filesystem.sizeBytes),
+          filesystem.isLow ? .orange : .purple)
       }
       HStack {
         Text("Totals exclude the VM operating system.").font(.caption).foregroundStyle(.secondary)

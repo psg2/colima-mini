@@ -27,6 +27,19 @@ final class StorageTests: XCTestCase {
     XCTAssertThrowsError(try FilesystemUsage.decode("Filesystem\n/dev/vdb1 unknown 100 800 10% /"))
   }
 
+  func testLowDiskWarnsBelowATenthOrThreeGiB() throws {
+    func usage(size: Int64, available: Int64) throws -> FilesystemUsage {
+      try FilesystemUsage.decode(
+        "Filesystem 1B-blocks Used Available Use% Mounted on\n/dev/vdb1 \(size) \(size - available) \(available) 0% /var/lib/docker\n"
+      )
+    }
+    let gib: Int64 = 1 << 30
+    XCTAssertFalse(try usage(size: 100 * gib, available: 79 * gib).isLow)
+    XCTAssertTrue(try usage(size: 100 * gib, available: 9 * gib).isLow)
+    XCTAssertFalse(try usage(size: 20 * gib, available: 4 * gib).isLow)
+    XCTAssertTrue(try usage(size: 20 * gib, available: 2 * gib).isLow)
+  }
+
   func testUnsupportedAccountingFailsInsteadOfInventingZeros() throws {
     XCTAssertThrowsError(try DockerStorageCategory.decode(""))
     XCTAssertThrowsError(

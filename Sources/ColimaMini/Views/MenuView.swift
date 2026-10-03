@@ -136,7 +136,9 @@ struct MenuView: View {
             String(
               format: "Disk %.0f%%",
               Double(filesystem.usedBytes) / Double(max(1, filesystem.sizeBytes)) * 100)
-          ).help(bytesText(Double(filesystem.usedBytes)) + " of the Docker data disk used")
+          ).foregroundStyle(filesystem.isLow ? Color.orange : Color.secondary)
+            .help(
+              bytesText(Double(filesystem.availableBytes)) + " free on the Docker data disk")
         }
       }.font(.caption).monospacedDigit().foregroundStyle(.secondary)
       ProgressView(value: min(1, memory / Double(max(1, snapshot.vm.memory)))).tint(.blue)
