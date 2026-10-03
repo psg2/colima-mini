@@ -4,272 +4,105 @@
 
 [![CI](https://github.com/psg2/colima-mini/actions/workflows/ci.yml/badge.svg)](https://github.com/psg2/colima-mini/actions/workflows/ci.yml)
 
-A native macOS dashboard for the default [Colima](https://github.com/abiosoft/colima)
-profile. Manage existing containers, inspect their logs, ports and mounts, and
-change VM resources from a small SwiftUI app and menu bar panel.
+A native macOS app and menu bar panel for Docker on [Colima](https://github.com/abiosoft/colima).
+It shows your Compose projects and containers with their logs, ports, mounts and
+environment, and it manages images, volumes, networks, disk space and the VM's
+CPU, memory and disk. It works on the default Colima profile.
 
-Colima Mini is an independent, unofficial project licensed under MIT.
+Colima Mini is an independent, unofficial project under the MIT license.
 
-![The v0.4.0 dashboard with Compose projects and container logs](docs/images/dashboard.png)
-
-The screenshot and published v0.4.0 ZIP show the earlier dashboard layout.
-Build from source for the container pages, Volumes and Storage views described here.
+![Containers grouped by Compose project, with health, ports, CPU and memory](docs/images/dashboard.png)
 
 ## Install
 
-1. Install [Homebrew](https://brew.sh), then install the runtime tools:
+1. Install the runtime with [Homebrew](https://brew.sh) and start the default profile:
 
    ```sh
    brew install colima docker python
-   ```
-
-2. Create the default Colima profile if it doesn't exist:
-
-   ```sh
    colima start
    ```
 
-3. Download the universal app from [GitHub Releases](https://github.com/psg2/colima-mini/releases/latest),
-   unzip it, and move **Colima Mini.app** to Applications.
+2. Download the app from [GitHub Releases](https://github.com/psg2/colima-mini/releases/latest),
+   unzip it and move **Colima Mini.app** to Applications.
 
-The app requires macOS 14 or later. Release builds contain Apple Silicon and Intel
-binaries. They are ad-hoc signed, not Apple Developer ID signed or notarized.
-Building locally is also supported. Colima, Docker CLI and Python 3 are separate
-dependencies; no Docker engine is bundled.
+It needs macOS 14 or later and runs on Apple Silicon and Intel. The app doesn't
+bundle a Docker engine; it drives the Colima and Docker CLIs you installed.
 
-Use Docker Compose separately to create your projects. The app manages existing
-containers and doesn't create Compose deployments or recreate missing services.
+The latest release (v0.4.0) predates most of what this page describes. Until the
+next one, [build from source](#build-from-source) to get it.
 
 ### Open a downloaded release for the first time
 
-Download the ZIP and its matching `.sha256` file from the same release. In their
-download directory, verify the archive before extracting it:
+Releases are ad-hoc signed, not notarized, so macOS asks before the first launch.
+Check the download against its published checksum first:
 
 ```sh
 shasum -a 256 -c ColimaMini-X.Y.Z-macos-universal.zip.sha256
 ```
 
-Replace `X.Y.Z` with the release version. The result must end in `OK`. This checks
-the archive against the published checksum; it isn't Apple notarization.
+It must print `OK`. Then open the app. If macOS blocks it, open **System Settings**,
+go to **Privacy & Security**, and choose **Open Anyway** next to Colima Mini
+([Apple's instructions](https://support.apple.com/en-us/102445)). That allows this
+one app and leaves Gatekeeper on.
 
-After moving the app to Applications, try opening it. If macOS blocks it because
-the developer can't be verified, follow Apple's
-[instructions for opening a trusted app](https://support.apple.com/en-us/102445):
+## What it does
 
-1. Open **System Settings** and select **Privacy & Security**.
-2. Find the message for **Colima Mini** and select **Open Anyway**.
-3. Review the app-specific prompt and select **Open** if you trust the download.
+- **Containers.** Compose projects collapse into groups, labeled with where they
+  ran (a folder, or a Claude, Codex, Conductor or Orca worktree). Start, stop,
+  restart or remove containers one at a time or several at once. Run Compose
+  **Up**, **Pull** and **Down** on a project. Click a port to copy it, or to open
+  known web UIs such as pgweb, Adminer or Grafana.
+- **Container pages.** Live logs with search, wrap and pause; ports; mounts;
+  environment variables with secrets masked. **Shell** and **Open** use the
+  terminal and editor you pick from their menus.
+- **Unused containers.** **Review unused containers** finds stacks whose folder
+  was deleted, stopped for over a day, or idle, and offers to stop or remove them.
+- **Images, volumes and networks.** Sizes, which containers use each one, and
+  removal of the unused ones, singly or in bulk. Docker refuses anything still in use.
+- **Disk.** Storage shows the VM disk, Docker's usage and the space taken on your
+  Mac. **Reclaim space** previews build cache, unused images, networks, stopped
+  containers and anonymous volumes before removing what you pick. Named volumes
+  are never part of it.
+- **VM.** Change CPU, memory and disk in Settings, then save for the next start
+  or restart now. Running containers come back after the restart.
+- **Menu bar.** Status, usage, containers that need attention and every project
+  with its actions. Notifications when a container crashes, fails its health
+  check or keeps restarting.
 
-This creates an exception for this app. Keep Gatekeeper enabled. Managed Macs
-might restrict this exception. You can also [build from source](#build-from-source).
-Confirm that the dashboard opens and reports the default Colima profile.
+The [user guide](docs/guide.md) covers each page, and
+[storage and cleanup](docs/storage.md) explains the measurements and what each
+removal touches.
 
-## Use
-
-Use the sidebar to open Overview, Containers, a Compose project, Images, Volumes,
-Networks, Storage or Settings. The app reopens the last page you used. Press **Command+K** to
-search loaded objects and pages. Type an action such as `restart`, `shell` or `logs`
-to act on a container. Use the arrow keys to choose a result and Return to open it.
-Settings is a separate window with Resources, Apps and General tabs. Open it from
-the bottom of the sidebar, the menu bar, Command+K or **Command+,**. **Resources…**
-on Overview and **Change…** on Storage open it on the Resources tab.
-
-Closing the window keeps Colima Mini in the menu bar and, by default, removes
-its Dock icon; opening the dashboard from the menu brings the icon back. Turn
-this off in Settings to keep the Dock icon.
+![Overview with VM status, counts and resource usage](docs/images/overview.png)
 
 ### Keyboard shortcuts
 
-The **Go** and **Container** menus list every shortcut.
+The **Go** and **Container** menus list them all.
 
 | Keys | Action |
 | --- | --- |
 | ⌘1 … ⌘6 | Overview, Containers, Images, Volumes, Networks, Storage |
 | ⌘K | Search and actions |
-| ⌘F | Focus the filter or log search on the current page |
-| ⌘[ | Back |
+| ⌘F | Filter the current page or search logs |
+| ⌘[ or Esc | Back |
 | ⌘R | Refresh |
 | ⌘, | Settings |
 | ⌥⌘1 … ⌥⌘5 | Container tabs: Overview, Logs, Ports, Mounts, Env |
-| ⇧⌘T | Open a shell in the container |
-| ⇧⌘O | Open the project folder in the default app |
-| ⇧⌘S / ⇧⌘R | Stop or start / restart the container (asks first) |
+| ⇧⌘T | Shell in the container |
+| ⇧⌘O | Open the project folder |
+| ⇧⌘S / ⇧⌘R | Stop or start / restart (asks first) |
 | ⌘⌫ | Remove the stopped container (asks first) |
 
-- Expand or collapse each Compose project, use the direct **Collapse all** or
-  **Expand all** action, or switch to a flat container list. Searching reveals
-  matching services without discarding your saved collapsed groups.
-- Overview shows the VM, counts, reclaimable estimates, containers that need
-  attention, resource meters and recent CPU. **Resources…** opens the VM settings,
-  and the status bar usage opens Overview. When less than a tenth of the Docker data
-  disk, or less than 3 GiB, is free, the status bar shows **Low disk**, which opens
-  Storage, and the disk meters turn orange. Overview CPU is relative to allocated
-  VM capacity; row CPU follows Docker's 100% per core convention.
-- Each project shows where Compose ran it. Claude, Codex, Conductor and Orca
-  worktrees are labeled, and a project whose folder was removed shows
-  **Folder missing**. **Open** sends the folder to your default app in one click;
-  its menu lists installed editors and terminals with their icons, and the one
-  you pick becomes the default. It also opens the Git remote's branch page.
-- The status bar shows container CPU and memory against the VM allocation and the
-  Docker data disk. The menu bar adds per-project CPU and memory and disk use.
-- Remove a stopped container from its row, menu or page. Running containers aren't
-  offered, and removal keeps volumes. The container page also shows network and
-  disk I/O and process count.
-- Rows show health, uptime and published ports. Click a port to copy
-  `localhost:PORT`; its menu opens HTTP or HTTPS explicitly. For images known to
-  serve a web page on that port, such as pgweb, Adminer, Grafana, nginx or the
-  RabbitMQ management UI, the chip shows ↗ and a click opens it in the browser.
-  Rows show an icon for the image's kind: database, cache, queue, web tool… Hover a row for Logs,
-  Shell and Restart, or right-click for every action.
-- Select several containers with the circle that appears on hover, or ⌘-click a
-  row. While some are selected, clicking a row toggles it, and the bar above the
-  list starts, stops, restarts or removes the ones each action fits, after one
-  confirmation. Escape clears the selection.
-- **Shell** opens `docker exec -it` in your terminal app, preferring bash. Like
-  **Open**, its menu lists installed terminals (Terminal, iTerm, cmux, Ghostty, Warp,
-  WezTerm, kitty or Alacritty); picking one makes it the default. Settings has the
-  same choice.
-- Filter by project, search names or images, and show only running containers.
-- Start, stop and restart containers or displayed project groups, with confirmation.
-- Open a container page for Overview, Logs, Ports, Mounts and Env. Back names the
-  page it returns to, with its filters; Escape and ⌘[ do the same, and clicking
-  the page's section or project in the sidebar returns to that list.
-- **Env** lists the container's environment variables. Names that usually hold
-  credentials (password, secret, token, key, DSN…) and URLs with a password are
-  masked until you reveal them one at a time, and a masked value can't be
-  copied. Values are read only while the tab is open.
-- Follow logs live: the last 500 lines, then new output as it arrives, keeping up
-  to 5,000 lines. Pause, scroll with the latest output, wrap long lines, search
-  and copy the displayed text. Logs open at the start of each line.
-- Follow a whole project with **Logs** on its page, **Show logs** in its menu or
-  Command+K. Each line names its service, and **Services** hides the ones you
-  don't need.
-- Run Compose on a project from its menu: **Up**, **Pull images**, **Down…** and
-  **Down and delete volumes…**. Each asks first. The app reads the project's
-  folder, compose files and env files from Compose's container labels. Up and
-  pull need that folder; down also works after a worktree is deleted.
-- Inspect published port bindings and copy their addresses. TCP doesn't identify
-  an HTTP service, so database ports don't get an inferred browser URL.
-- Inspect named and anonymous volumes and their container mount destinations. References include
-  stopped containers; an unattached volume isn't automatically safe to delete. The list
-  starts with named volumes and remembers the Kind you pick. An unattached volume's page
-  offers **Remove…**, which deletes it and its data after confirmation. To delete
-  several, hover an unattached volume's icon or ⌘-click rows to select them; the bar
-  shows their total size and **Remove N…** asks once.
-- Open **Networks** to see each network's driver, subnet, Compose project and the
-  running containers on it, with their addresses. **Remove…** deletes an unused
-  custom network without force; Docker refuses one a stopped container still uses.
-- **Review unused…** on the Containers page scans for stale stacks. It shows a
-  folder badge, as does the sidebar, when a project's folder or worktree was
-  deleted; the menu bar lists those projects too. The scan groups containers by project, explains each verdict
-  (deleted worktree, stopped for over a day, idle, in use) and offers **Stop**
-  or **Remove…** per group, with confirmation. The scan itself changes nothing.
-- Change CPU, RAM and refresh interval in Settings.
+### What it won't do
 
-### Diagnose a container
-
-Overview shows health, exit code, OOM status and restart count. Inspection updates
-after a lifecycle action, on explicit Refresh, and every 30 seconds while Overview
-is active. CPU and memory history keeps up to 60 samples collected while the
-dashboard is open. Missing measurements remain unavailable.
-
-Only a visible, active Logs tab streams. Leaving the tab, pausing or switching
-apps stops the `docker logs --follow` process. A restarted container is followed
-again once it runs. Search pauses automatic scrolling; Pause keeps the last
-buffer. A stream error preserves that buffer and shows a separate error. Ports requires an explicit HTTP or HTTPS choice
-when opening a web endpoint.
-
-### Inspect images
-
-Images shows virtual, shared and unique layer sizes and links to containers using
-an image, including stopped containers. Shared layers make summed image virtual
-sizes different from physical disk usage. Filter to unused images and sort by size.
-**Pull latest** (row menu or image page) runs `docker pull` for the tag, and
-**Remove…** runs `docker image rm` without force on an unused image, so Docker
-refuses one any container, running or stopped, still uses. Select several unused
-images the same way (hover the icon or ⌘-click) to remove them together; the bar
-shows the space in their own layers. A refusal doesn't stop the rest and stays listed.
-
-### Understand storage measurements
-
-Storage reports these measurements separately:
-
-- **Configured capacity:** the Colima data disk's configured limit.
-- **VM filesystem:** its size, used bytes and available bytes. Filesystem overhead
-  and reserved blocks can make available space smaller than size minus used space.
-- **Docker objects:** images, containers, volumes and build cache, with Docker's
-  reclaimable estimates. Shared image layers aren't independent physical copies.
-- **Mac disk footprint:** allocated blocks of the identified VM image files.
-  Sparse files can have a logical size larger than their allocated blocks.
-
-Unknown sizes and unsupported VM image layouts show Unavailable rather than zero.
-Mac allocation is an estimate under APFS sharing and compression. Docker reclaimable
-bytes don't promise an equal reduction in the Mac disk footprint. Volume metadata
-uses Linux mount paths; these aren't folders you can open in Finder.
-
-Storage refreshes separately from the container list. A storage read failure
-doesn't prevent container navigation or controls. Docker objects are removed
-only by actions you confirm: Reclaim space, container, image, network and
-volume removal, and Compose down. Reclaim space never removes named volumes;
-a named volume goes only through **Remove…** on its unattached volume page or
-**Down and delete volumes…**. The app never compacts disk images, and the disk
-only grows through Settings.
-
-### Reclaim space
-
-**Reclaim space…** (Storage, the Go menu or Command+K) previews what can go. Images,
-Volumes and Networks each have their own **Remove unused…** (or **Remove anonymous…**),
-which opens the same preview limited to that page's objects:
-
-- **Selected by default:** build cache, dangling images and unused custom networks.
-- **Marked Review, selected only by you:**
-  - stopped containers;
-  - tagged images that no container uses, stopped ones included;
-  - unattached anonymous volumes.
-
-Each category lists its items and Docker's size estimate. After confirmation, the
-app removes exactly the listed items one by one, by ID and without `--force`.
-Docker refuses anything that started running or gained a container since the
-preview, and the result lists those refusals. Named volumes are never offered.
-Build cache uses `docker builder prune`, which only removes cache that isn't in use.
-Removing stopped containers can leave newly unused images or volumes; measure
-again to see them. Space freed inside the VM may not shrink the Mac disk footprint
-right away.
-
-To print the preview without opening a window:
-
-```sh
-"dist/Colima Mini.app/Contents/MacOS/ColimaMini" --reclaim-plan
-```
-
-### Change VM resources
-
-**Save for next start** updates CPU, memory and disk size without interrupting the VM.
-The disk can only grow: Colima resizes it on the next start and can't shrink it,
-so the slider starts at the configured size.
-**Apply & restart…** asks for confirmation, restarts Colima, verifies its allocation,
-and restores the containers running immediately before Colima was stopped. Docker volumes are kept.
-Settings modify only root `cpu`, `memory` and `disk` fields in the local profile, preserving
-other settings, comments and permissions. The first original file is retained as
-`colima.yaml.mini-backup` beside the profile.
-
-The menu bar shows a monochrome llama matching the app icon. It dims while Colima
-is stopped and shows a count when containers need attention. Its panel lists those
-containers first, then expandable projects with ports, shells and actions.
-When a container exits unexpectedly, starts failing its health check or enters a
-restart loop, the app sends a notification; clicking it opens the logs. Changes
-made from Colima Mini don't notify, and exit code 143 (a normal `docker stop`)
-is ignored. Turn this off or open the app at login in Settings; a launch at login
-starts in the menu bar without opening the dashboard. Refresh slows to
-at most every 30 seconds while another app is in front.
-Closing the dashboard keeps the menu bar available. Quitting Colima Mini leaves Colima running.
-Docker operations explicitly select the `colima` context; a foreign terminal
-`DOCKER_HOST` or `DOCKER_CONTEXT` does not redirect the app.
+Every removal asks first and runs without `--force`, so Docker refuses anything a
+container still uses. The app never compacts disk images or shrinks the VM disk.
+It only talks to the `colima` Docker context, whatever `DOCKER_HOST` or
+`DOCKER_CONTEXT` your shell sets. Quitting it leaves Colima running.
 
 ## Build from source
 
-Use Swift 6 or later with Xcode or matching Command Line Tools. No Xcode project
-or external Swift package dependencies are needed.
+You need Swift 6 or later from Xcode or the Command Line Tools.
 
 ```sh
 git clone https://github.com/psg2/colima-mini.git
@@ -278,100 +111,21 @@ cd colima-mini
 open "$HOME/Applications/Colima Mini.app"
 ```
 
-You can also double-click `run-ui.command` in Finder. It builds the app and opens it.
-For a universal build, use `./Scripts/build-app.sh --universal`.
-
-To preview with synthetic data:
+To try it with sample data instead of your containers:
 
 ```sh
 ./Scripts/run.sh --fixture "$PWD/Tests/ColimaCoreTests/Fixtures/sample.json"
 ```
 
-The launcher creates a separate Sample instance even if the real dashboard is
-already running. Confirm that its title includes **Sample data** and its sidebar
-shows **Sample**. Sample mode disables runtime, container and resource changes.
-
-To check your actual runtime without opening a window:
-
-```sh
-"dist/Colima Mini.app/Contents/MacOS/ColimaMini" --check
-```
-
-To print the actual cleanup report without changing containers:
-
-```sh
-"dist/Colima Mini.app/Contents/MacOS/ColimaMini" --scan
-```
-
-Tools are discovered through `PATH` and common Homebrew locations. Advanced users
-can set absolute executable overrides with `COLIMA_MINI_DOCKER`,
-`COLIMA_MINI_COLIMA` and `COLIMA_MINI_PYTHON3`. `COLIMA_HOME` selects the local
-profile directory when set.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    Views[SwiftUI views and menu bar] --> State[Dashboard state]
-    State --> Core[ColimaCore]
-    Core --> CLIs[Installed Docker and Colima CLIs]
-    Core --> Config[Local resource configuration]
-    Core --> Scanner[Bundled read-only cleanup scanner]
-    Tests[Core tests with temporary configs and local runtimes] --> Core
-```
-
-```text
-Sources/ColimaCore/       Runtime operations, process execution, models and config
-Sources/ColimaAppState/   Navigation, refresh coordination and observable state
-Sources/ColimaMini/       App entry point and individual SwiftUI views
-Tests/ColimaCoreTests/    Parser, process, config and runtime integration tests
-Tests/ColimaAppStateTests/ Navigation and observable state tests
-Resources/               Application icon source
-Scripts/                 Build, verification, packaging and installation
-.github/workflows/       macOS CI and tag-based release publication
-```
-
-The app bundle contains its scanner and does not depend on a dotfiles checkout
-or a compile-time source directory. The scanner requires Python 3 and uses only
-its standard library. Subprocess output is held in private temporary files and
-removed after the command completes. Logs stay local.
-
-## Validate
-
-```sh
-./Scripts/check.sh
-./Scripts/build-app.sh
-./Scripts/test-app.sh
-```
-
-CI runs on standard GitHub-hosted Apple Silicon and Intel macOS runners. It checks
-Swift formatting, unit and subprocess integration tests, scanner behavior,
-release compilation, signatures and a relocated app. Runtime tests use local fake
-executables because hosted macOS runners cannot run nested Colima VMs.
-
-Manual validation on a Mac with Colima remains necessary for actual VM restart,
-native interaction and networking. Automated checks do not stop your local VM.
-
-## Release
-
-Update `VERSION`, run the validation commands, and create the corresponding `vX.Y.Z`
-tag. The release workflow verifies the version, reruns checks, builds a universal
-app and publishes a ZIP with its SHA-256 checksum. It can also be dispatched
-manually for an existing matching version tag.
-
-```sh
-./Scripts/package-release.sh
-```
-
-This command builds the local release archive; it does not publish it.
+[Development](docs/development.md) covers the architecture, tests, command-line
+checks and releases.
 
 ## References
 
-- [Trimmy](https://github.com/steipete/Trimmy) and [CodexBar](https://github.com/steipete/CodexBar):
-  native Swift apps with package-based core and app separation.
-- [Docker Desktop](https://docs.docker.com/desktop/use-desktop/container/):
-  Compose grouping, project controls, metrics and logs.
-- [OrbStack](https://docs.orbstack.dev/settings) and [ColimaBar](https://github.com/tdi/colimabar):
-  resource settings and compact native status controls.
+- [Trimmy](https://github.com/steipete/Trimmy) and [CodexBar](https://github.com/steipete/CodexBar)
+  for the package layout of a native Swift app.
+- [Docker Desktop](https://docs.docker.com/desktop/use-desktop/container/),
+  [OrbStack](https://docs.orbstack.dev/settings) and [ColimaBar](https://github.com/tdi/colimabar)
+  for Compose grouping, resource settings and menu bar controls.
 
-See [icon provenance](docs/icon.md) for the generated icon and its prompt.
+The icon's prompt and provenance are in [docs/icon.md](docs/icon.md).
