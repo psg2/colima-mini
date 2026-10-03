@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   secrets-scan:
-    name: Secrets scan
+    name: Secrets Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -29,14 +29,10 @@ jobs:
           echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
           tar -xzf gitleaks.tar.gz gitleaks
           ./gitleaks git --redact --verbose .
-  build-test:
-    name: Build and test (${{ matrix.runner }})
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [macos-15, macos-15-intel]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+  macos:
+    name: Format · Lint · Build · Test
+    runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,3 +41,19 @@ jobs:
         uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
       - name: Run quality gates
         run: mise run ci
+  older-macos:
+    name: macOS 15 (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned repository tools
+        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+      - name: Build and test on macOS 15 and Intel
+        run: mise run test

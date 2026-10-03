@@ -214,7 +214,7 @@ struct SettingsView: View {
                         }
                     }
                     Divider()
-                    if let vm = model.snapshot?.vm {
+                    if model.snapshot?.vm != nil {
                         Text(currentVM ?? "").font(.caption).foregroundStyle(.secondary)
                         if !changed && differsFromVM {
                             Text("Saved changes are waiting for the next start.").font(.caption).foregroundStyle(
