@@ -258,7 +258,6 @@ package struct PendingAction: Identifiable {
     case .image(let id): return images.first { $0.id == id }?.name ?? "Image"
     case .networks: return "Networks"
     case .storage: return "Storage"
-    case .settings: return "Settings"
     }
   }
   package func goBack() {

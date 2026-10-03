@@ -102,8 +102,6 @@ struct DashboardView: View {
     case .networks: NetworksView(model: model)
     case .image(let id): ImageDetailView(model: model, id: id)
     case .storage: StorageView(model: model)
-    case .settings:
-      ScrollView { SettingsView(model: model).frame(maxWidth: .infinity, alignment: .leading) }
     }
   }
 }

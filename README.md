@@ -70,8 +70,9 @@ Use the sidebar to open Overview, Containers, a Compose project, Images, Volumes
 Networks, Storage or Settings. The app reopens the last page you used. Press **Command+K** to
 search loaded objects and pages. Type an action such as `restart`, `shell` or `logs`
 to act on a container. Use the arrow keys to choose a result and Return to open it.
-Settings stays aligned at the bottom and is also available with **Command+,**, which
-opens a compact window with Resources, Apps and General tabs.
+Settings is a separate window with Resources, Apps and General tabs. Open it from
+the bottom of the sidebar, the menu bar, Command+K or **Command+,**. **Resources…**
+on Overview and **Change…** on Storage open it on the Resources tab.
 
 Closing the window keeps Colima Mini in the menu bar and, by default, removes
 its Dock icon; opening the dashboard from the menu brings the icon back. Turn

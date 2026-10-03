@@ -6,6 +6,21 @@ import Foundation
 import ServiceManagement
 import SwiftUI
 
+enum SettingsTab: String {
+  case resources, apps, general
+  static let key = "settingsTab"
+}
+
+// Opens the Settings window on a tab, from anywhere in the app.
+struct SettingsOpener {
+  let openSettings: OpenSettingsAction
+  @MainActor func callAsFunction(_ tab: SettingsTab? = nil) {
+    if let tab { UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.key) }
+    openSettings()
+    NSApp.activate(ignoringOtherApps: true)
+  }
+}
+
 struct SettingsView: View {
   @ObservedObject var model: Dashboard
   @State private var cpus = 10.0
@@ -124,38 +139,17 @@ struct SettingsView: View {
     guard let vm = model.snapshot?.vm else { return nil }
     return "Current VM: " + vm.allocation
   }
-  // The Settings window (⌘,) uses tabs so it fits on screen; the dashboard
-  // page shows every section in one scrolling column.
-  var tabbed = false
+  @AppStorage(SettingsTab.key) private var tab = SettingsTab.resources
   var body: some View {
-    Group {
-      if tabbed {
-        TabView {
-          resourcesTab.padding(20).tabItem { Label("Resources", systemImage: "cpu") }
-          appsTab.padding(20).tabItem { Label("Apps", systemImage: "square.grid.2x2") }
-          generalTab.padding(20).tabItem { Label("General", systemImage: "gearshape") }
-        }.frame(width: 560)
-      } else {
-        VStack(alignment: .leading, spacing: 20) {
-          HStack {
-            if let icon = NSApp.applicationIconImage {
-              Image(nsImage: icon).resizable().frame(width: 48, height: 48)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-              Text("Settings").font(.title2.weight(.semibold))
-              Text("Default Colima profile").foregroundStyle(.secondary)
-            }
-            Spacer()
-            if model.sample {
-              Text("Sample · changes disabled").font(.caption).foregroundStyle(.orange)
-            }
-          }
-          resourcesTab
-          appsTab
-          generalTab
-        }.padding(24).frame(width: 570)
-      }
+    TabView(selection: $tab) {
+      resourcesTab.padding(20).tabItem { Label("Resources", systemImage: "cpu") }
+        .tag(SettingsTab.resources)
+      appsTab.padding(20).tabItem { Label("Apps", systemImage: "square.grid.2x2") }
+        .tag(SettingsTab.apps)
+      generalTab.padding(20).tabItem { Label("General", systemImage: "gearshape") }
+        .tag(SettingsTab.general)
     }
+    .frame(width: 560)
     .onAppear { load() }
     .onChange(of: model.refreshInterval) { _, _ in model.savePreferences() }
     .onChange(of: model.notificationsEnabled) { _, enabled in

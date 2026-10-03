@@ -3,6 +3,7 @@ import SwiftUI
 
 struct StorageView: View {
   @ObservedObject var model: Dashboard
+  @Environment(\.openSettings) private var openSettings
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
@@ -33,7 +34,8 @@ struct StorageView: View {
                   + (storage.configuredCapacityBytes.map { bytesText(Double($0)) } ?? "Unavailable")
               )
               .foregroundStyle(.secondary)
-              Button("Change…") { model.navigate(.settings) }.controlSize(.small)
+              Button("Change…") { SettingsOpener(openSettings: openSettings)(.resources) }
+                .controlSize(.small)
                 .help("Grow the disk in Settings")
             }
             if let filesystem = storage.filesystem {

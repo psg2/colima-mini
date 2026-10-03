@@ -5,6 +5,7 @@ import SwiftUI
 
 struct OverviewView: View {
   @ObservedObject var model: Dashboard
+  @Environment(\.openSettings) private var openSettings
   private var category: (String) -> DockerStorageCategory? {
     { type in model.storage?.docker.first { $0.type == type } }
   }
@@ -81,7 +82,7 @@ struct OverviewView: View {
       }
       Spacer()
       if let vm = model.snapshot?.vm {
-        Button("Resources…") { model.navigate(.settings) }
+        Button("Resources…") { SettingsOpener(openSettings: openSettings)(.resources) }
           .help("CPU, memory and disk for the VM")
         Group {
           if vm.running {
