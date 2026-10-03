@@ -8,6 +8,7 @@ private enum SidebarSelection: Hashable {
 }
 struct SidebarView: View {
   @ObservedObject var model: Dashboard
+  @Environment(\.openSettings) private var openSettings
   private var selection: Binding<SidebarSelection?> {
     Binding(
       get: {
@@ -86,11 +87,15 @@ struct SidebarView: View {
         }
       }.listStyle(.sidebar)
       Divider().padding(.horizontal, 16)
-      List(selection: selection) {
-        Label("Settings", systemImage: "gearshape")
-          .tag(SidebarSelection.section(.settings))
-          .accessibilityIdentifier("dashboard.settings")
-      }.listStyle(.sidebar).scrollDisabled(true).frame(height: 48)
+      // Settings is its own window (⌘,), as in other Mac apps, not a page.
+      Button {
+        SettingsOpener(openSettings: openSettings)()
+      } label: {
+        Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain).padding(.horizontal, 22).padding(.vertical, 14)
+      .help("Settings (⌘,)").accessibilityIdentifier("dashboard.settings")
 
     }
   }

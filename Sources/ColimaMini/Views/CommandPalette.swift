@@ -13,6 +13,7 @@ private struct PaletteResult: Identifiable {
 struct CommandPalette: View {
   @ObservedObject var model: Dashboard
   @Binding var presented: Bool
+  @Environment(\.openSettings) private var openSettings
   @State private var query = ""
   @State private var selected: String?
   @FocusState private var focused: Bool
@@ -20,12 +21,16 @@ struct CommandPalette: View {
     var values = [
       ("Overview", AppRoute.overview), ("Containers", .containers), ("Images", .images),
       ("Volumes", .volumes), ("Networks", .networks),
-      ("Storage", .storage), ("Settings", .settings),
+      ("Storage", .storage),
     ].map {
       PaletteResult(
         id: "page." + $0.0, title: $0.0, subtitle: "Page", symbol: "arrow.turn.down.right",
         route: $0.1)
     }
+    values.append(
+      PaletteResult(
+        id: "page.Settings", title: "Settings", subtitle: "Window · ⌘,", symbol: "gearshape",
+        run: { [openSettings] in SettingsOpener(openSettings: openSettings)() }))
     values += (model.snapshot?.projects ?? []).map {
       PaletteResult(
         id: "project." + $0, title: $0, subtitle: "Project", symbol: "folder", route: .containers,

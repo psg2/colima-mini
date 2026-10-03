@@ -11,7 +11,6 @@ package enum AppRoute: Hashable {
   case image(String)
   case networks
   case storage
-  case settings
 
   // Top-level pages the app reopens on the next launch.
   package var sectionName: String? {
