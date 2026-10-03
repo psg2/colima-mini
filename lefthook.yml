@@ -1,0 +1,5 @@
+# Install with `mise run hooks`. Use LEFTHOOK=0 only for emergencies.
+pre-push:
+  jobs:
+    - name: publication gates
+      run: mise run check

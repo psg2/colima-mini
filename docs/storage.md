@@ -48,7 +48,7 @@ images or volumes behind; measure again to see them.
 To print the preview from the command line without changing anything:
 
 ```sh
-"dist/Colima Mini.app/Contents/MacOS/ColimaMini" --reclaim-plan
+"build/Colima Mini.app/Contents/MacOS/ColimaMini" --reclaim-plan
 ```
 
 ## What removes what

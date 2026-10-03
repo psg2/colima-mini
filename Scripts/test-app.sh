@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${1:-$ROOT/dist/Colima Mini.app}"
+APP="${1:-$ROOT/build/Colima Mini.app}"
 codesign --verify --deep --strict "$APP"
 "$APP/Contents/MacOS/ColimaMini" --check --fixture "$ROOT/Tests/ColimaCoreTests/Fixtures/sample.json" |
 python3 -c 'import json,sys; s=json.load(sys.stdin); assert s["containers"]==3 and s["running"]==2 and s["localhostPorts"]==[5432,8080]; print("Packaged app summary passed")'

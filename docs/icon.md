@@ -2,7 +2,7 @@
 
 [`Resources/app-icon.png`](../Resources/app-icon.png) was generated with the built-in image generation tool. The build
 script preserves its transparency and creates the standard macOS icon sizes
-and `AppIcon.icns` inside the ignored `dist/` directory.
+and `AppIcon.icns` inside the ignored `build/` directory.
 
 Generation prompt:
 

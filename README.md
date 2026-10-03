@@ -102,23 +102,25 @@ It only talks to the `colima` Docker context, whatever `DOCKER_HOST` or
 
 ## Build from source
 
-You need Swift 6 or later from Xcode or the Command Line Tools.
+You need Swift 6 or later from Xcode or the Command Line Tools, and
+[mise](https://mise.jdx.dev) for the project tasks.
 
 ```sh
 git clone https://github.com/psg2/colima-mini.git
 cd colima-mini
-./Scripts/build-app.sh --install
+mise run install
 open "$HOME/Applications/Colima Mini.app"
 ```
 
 To try it with sample data instead of your containers:
 
 ```sh
-./Scripts/run.sh --fixture "$PWD/Tests/ColimaCoreTests/Fixtures/sample.json"
+mise run run --fixture "$PWD/Tests/ColimaCoreTests/Fixtures/sample.json"
 ```
 
-[Development](docs/development.md) covers the architecture, tests, command-line
-checks and releases.
+[Development](docs/development.md) covers the tasks and tests,
+[Architecture](docs/ARCHITECTURE.md) the code layout and
+[Releasing](docs/RELEASING.md) how versions ship.
 
 ## References
 

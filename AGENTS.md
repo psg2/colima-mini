@@ -13,7 +13,7 @@
 - Test observable behavior through module interfaces. Do not assert internal
   call order or source text. Use temporary configs and local fake executables
   for runtime tests; never stop the developer's VM during automated checks.
-- Run `./Scripts/check.sh`, `./Scripts/build-app.sh` and
-  `./Scripts/test-app.sh` before publishing code changes.
+- Run `mise run check` before publishing code changes. `mise tasks` lists the
+  other tasks (format, build, install, run, package-release).
 - Use standard GitHub-hosted runners. Keep write permissions limited to the
   release job, pin actions by full commit SHA, and never publish local credentials.

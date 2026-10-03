@@ -1,7 +1,7 @@
 .build/
 .build-app/
 .swiftpm/
-dist/
+build/
 .local/
 .DS_Store
 *.xcuserstate
