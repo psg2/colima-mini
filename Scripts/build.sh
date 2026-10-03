@@ -12,8 +12,8 @@ for argument in "$@"; do
 done
 VERSION="$(cat "$ROOT/VERSION")"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid VERSION.' >&2; exit 1; }
-mkdir -p "$ROOT/dist"
-STAGING="$(mktemp -d "$ROOT/dist/.app-build.XXXXXX")"
+mkdir -p "$ROOT/build"
+STAGING="$(mktemp -d "$ROOT/build/.app-build.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
 APP="$STAGING/Colima Mini.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$STAGING/AppIcon.iconset"
@@ -41,26 +41,15 @@ for size in 16 32 128 256 512; do
   sips -z "$retina" "$retina" "$ROOT/Resources/app-icon.png" --out "$STAGING/AppIcon.iconset/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns "$STAGING/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
-cat > "$APP/Contents/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>ColimaMini</string>
-<key>CFBundleIdentifier</key><string>com.psg2.colima-mini</string>
-<key>CFBundleName</key><string>Colima Mini</string>
-<key>CFBundleIconFile</key><string>AppIcon</string>
-<key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>$VERSION</string>
-<key>CFBundleVersion</key><string>$VERSION</string>
-<key>LSMinimumSystemVersion</key><string>14.0</string>
-<key>NSHighResolutionCapable</key><true/>
-</dict></plist>
-PLIST
+# The plist is versioned; the build stamps VERSION into it.
+cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
 codesign --force --sign - "$APP" >&2
 codesign --verify --deep --strict "$APP"
-FINAL="$ROOT/dist/Colima Mini.app"
+FINAL="$ROOT/build/Colima Mini.app"
 if [[ -e "$FINAL" ]]; then
-  [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$FINAL/Contents/Info.plist" 2>/dev/null || true)" == 'com.psg2.colima-mini' ]] || { echo 'Another app exists in dist.' >&2; exit 1; }
+  [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$FINAL/Contents/Info.plist" 2>/dev/null || true)" == 'com.psg2.colima-mini' ]] || { echo 'Another app exists in build.' >&2; exit 1; }
   rm -rf "$FINAL"
 fi
 mv "$APP" "$FINAL"

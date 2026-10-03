@@ -109,7 +109,7 @@ fi
   || fail "failed client probe classified containers as idle"
 output="$(FAKE_LSOF_MODE=empty sweep)"
 [[ "$output" != *"Scan failed:"* ]] || fail "lsof's successful empty query was rejected"
-if output="$(FAKE_DOCKER_FAIL=rm sweep --apply 2>&1)"; then
+if output="$(FAKE_DOCKER_FAIL="rm" sweep --apply 2>&1)"; then
   fail "rejected cleanup was accepted"
 fi
 [[ "$output" == *"Scan failed:"* && "$output" != *"removed  "* ]] \

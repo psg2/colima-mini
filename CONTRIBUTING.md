@@ -5,19 +5,15 @@ Reproduce issues using sample data or temporary local executables before
 testing against a real VM. Do not include real logs, credentials or local
 profile files in fixtures or screenshots.
 
-Run these checks before submitting a ready-for-review pull request:
+Install the pinned tools and the pre-push hook once:
 
 ```sh
-./Scripts/check.sh
-./Scripts/build-app.sh
-./Scripts/test-app.sh
+mise install
+mise run hooks
 ```
 
-For source formatting, run:
-
-```sh
-swift format format --in-place --recursive Sources Tests Package.swift
-```
+Before opening a ready-for-review pull request, run `mise run check`. It runs
+the same gates as CI plus a Gitleaks scan. `mise run format` fixes formatting.
 
 Describe the observable problem, resulting behavior, checks and any manual
 validation gap. Use tests that can catch realistic regressions through module
