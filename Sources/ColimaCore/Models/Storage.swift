@@ -27,6 +27,9 @@ package struct FilesystemUsage: Codable {
   package let availableBytes: Int64
   package let mountpoint: String
   package var reservedBytes: Int64 { max(0, sizeBytes - usedBytes - availableBytes) }
+  // Pulls and builds start failing well before the disk is full, so warn when
+  // less than a tenth or less than 3 GiB is left, whichever comes first.
+  package var isLow: Bool { availableBytes < max(sizeBytes / 10, 3 << 30) }
 
   package static func decode(_ output: String) throws -> FilesystemUsage {
     let rows = output.split(whereSeparator: \.isNewline).dropFirst()

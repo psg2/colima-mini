@@ -31,6 +31,17 @@ struct DashboardView: View {
               StatusBarUsage(snapshot: snapshot, filesystem: model.storage?.filesystem)
             }.buttonStyle(.plain)
           }
+          if let filesystem = model.storage?.filesystem, filesystem.isLow {
+            Button {
+              model.navigate(.storage)
+            } label: {
+              Label(
+                "Low disk · \(bytesText(Double(filesystem.availableBytes))) free",
+                systemImage: "exclamationmark.triangle.fill")
+            }.buttonStyle(.plain).foregroundStyle(.orange)
+              .help("Open Storage to reclaim space or grow the disk")
+              .accessibilityIdentifier("status.lowDisk")
+          }
           Spacer()
           Button {
             model.showingPalette = true

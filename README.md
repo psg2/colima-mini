@@ -100,7 +100,9 @@ The **Go** and **Container** menus list every shortcut.
   matching services without discarding your saved collapsed groups.
 - Overview shows the VM, counts, reclaimable estimates, containers that need
   attention, resource meters and recent CPU. **Resources…** opens the VM settings,
-  and the status bar usage opens Overview. Overview CPU is relative to allocated
+  and the status bar usage opens Overview. When less than a tenth of the Docker data
+  disk, or less than 3 GiB, is free, the status bar shows **Low disk**, which opens
+  Storage, and the disk meters turn orange. Overview CPU is relative to allocated
   VM capacity; row CPU follows Docker's 100% per core convention.
 - Each project shows where Compose ran it. Claude, Codex, Conductor and Orca
   worktrees are labeled, and a project whose folder was removed shows
