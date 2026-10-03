@@ -291,6 +291,32 @@ private actor ResultGate<Value> {
     await model.perform(action)
     XCTAssertEqual(model.route, .containers)
   }
+  func testBulkVolumeRemovalContinuesPastARefusalAndKeepsItVisible() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let docker = directory.appendingPathComponent("docker")
+    try Data(
+      #"""
+      #!/bin/sh
+      shift 2
+      if [ "$1 $2 $3" = "volume rm busy" ]; then echo "volume is in use" >&2; exit 1; fi
+      exit 0
+      """#.utf8
+    ).write(to: docker)
+    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: docker.path)
+    let model = Dashboard(
+      backend: Backend(
+        toolchain: Toolchain(environment: [
+          "COLIMA_MINI_DOCKER": docker.path, "COLIMA_MINI_COLIMA": "/usr/bin/true",
+        ])))
+    let removed = await model.removeVolumes(["first", "busy", "last"])
+    XCTAssertEqual(removed, ["first", "last"])
+    let error = try XCTUnwrap(model.volumesError)
+    XCTAssertTrue(error.contains("busy"), error)
+    XCTAssertFalse(error.contains("first") || error.contains("last"), error)
+    XCTAssertFalse(model.busy)
+  }
   func testReopeningTheSameContainerKeepsOneBackStep() async throws {
     let model = Dashboard(backend: backend())
     model.navigate(.volumes)

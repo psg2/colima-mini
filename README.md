@@ -152,7 +152,9 @@ The **Go** and **Container** menus list every shortcut.
 - Inspect named and anonymous volumes and their container mount destinations. References include
   stopped containers; an unattached volume isn't automatically safe to delete. The list
   starts with named volumes and remembers the Kind you pick. An unattached volume's page
-  offers **Remove…**, which deletes it and its data after confirmation.
+  offers **Remove…**, which deletes it and its data after confirmation. To delete
+  several, hover an unattached volume's icon or ⌘-click rows to select them; the bar
+  shows their total size and **Remove N…** asks once.
 - Open **Networks** to see each network's driver, subnet, Compose project and the
   running containers on it, with their addresses. **Remove…** deletes an unused
   custom network without force; Docker refuses one a stopped container still uses.
@@ -183,7 +185,9 @@ an image, including stopped containers. Shared layers make summed image virtual
 sizes different from physical disk usage. Filter to unused images and sort by size.
 **Pull latest** (row menu or image page) runs `docker pull` for the tag, and
 **Remove…** runs `docker image rm` without force on an unused image, so Docker
-refuses one any container, running or stopped, still uses.
+refuses one any container, running or stopped, still uses. Select several unused
+images the same way (hover the icon or ⌘-click) to remove them together; the bar
+shows the space in their own layers. A refusal doesn't stop the rest and stays listed.
 
 ### Understand storage measurements
 

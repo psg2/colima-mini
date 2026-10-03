@@ -7,6 +7,20 @@ struct ImagesView: View {
   @AppStorage("imageSortBySize") private var sortBySize = false
   @State private var unusedOnly = false
   @State private var removing: DockerImage?
+  @State private var selection: Set<String> = []
+  @State private var hovered: String?
+  @State private var confirmingBulk = false
+  private var selected: [DockerImage] {
+    model.images.filter { selection.contains($0.id) && $0.unused }
+  }
+  private func toggle(_ image: DockerImage) {
+    guard image.unused else { return }
+    if selection.contains(image.id) {
+      selection.remove(image.id)
+    } else {
+      selection.insert(image.id)
+    }
+  }
   var visible: [DockerImage] {
     model.images.filter {
       (model.imageSearch.isEmpty
@@ -48,6 +62,16 @@ struct ImagesView: View {
         ).font(.caption).foregroundStyle(.secondary)
       }
       if let error = model.imagesError { StatusMessage(text: error) }
+      if !selected.isEmpty {
+        let candidates = visible.filter(\.unused)
+        RemovalBar(
+          count: selected.count, noun: "image",
+          bytes: selected.compactMap(\.uniqueBytes).reduce(0, +), bytesNote: "in their own layers",
+          disabled: model.busy || model.sample,
+          selectAll: candidates.allSatisfy { selection.contains($0.id) }
+            ? nil : { selection.formUnion(candidates.map(\.id)) },
+          clear: { selection.removeAll() }, remove: { confirmingBulk = true })
+      }
       if let activity = model.imageActivity {
         HStack {
           ProgressView().controlSize(.small)
@@ -87,11 +111,32 @@ struct ImagesView: View {
           "Removes this tag, and the image once no tag is left. Docker refuses if a container still uses it. Pull downloads it again."
         )
       }
+      .confirmationDialog(
+        "Remove \(countText(selected.count, "image"))?", isPresented: $confirmingBulk,
+        titleVisibility: .visible
+      ) {
+        Button("Remove", role: .destructive) {
+          let targets = selected
+          selection.removeAll()
+          Task { await model.removeImages(targets) }
+        }
+      } message: {
+        Text(
+          selected.map(\.name).prefix(8).joined(separator: "\n")
+            + (selected.count > 8 ? "\n…and \(selected.count - 8) more" : "")
+            + "\n\nEach is removed without force; Docker refuses any a container started using. Pull downloads them again."
+        )
+      }
   }
 
   private func row(_ image: DockerImage) -> some View {
     HStack(spacing: 12) {
-      ImageIcon(profile: ImageProfile(image: image.name))
+      SelectionMark(
+        name: image.name, selectable: image.unused, selected: selection.contains(image.id),
+        selecting: !selection.isEmpty, hovering: hovered == image.id, toggle: { toggle(image) }
+      ) {
+        ImageIcon(profile: ImageProfile(image: image.name))
+      }
       VStack(alignment: .leading, spacing: 5) {
         Text(image.name).fontWeight(.medium)
         Text(
@@ -106,7 +151,22 @@ struct ImagesView: View {
       Text(bytesText(image.sizeBytes)).monospacedDigit()
       Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
     }.padding(12).contentShape(Rectangle())
-      .onTapGesture { model.openImage(image.id) }
+      .background(
+        selection.contains(image.id) ? Color.accentColor.opacity(0.18) : Color.clear,
+        in: RoundedRectangle(cornerRadius: 7)
+      )
+      .onHover { hovered = $0 ? image.id : (hovered == image.id ? nil : hovered) }
+      .gesture(
+        TapGesture().modifiers(.command).onEnded { toggle(image) }
+          .exclusively(
+            before: TapGesture().onEnded {
+              if selection.isEmpty || !image.unused {
+                model.openImage(image.id)
+              } else {
+                toggle(image)
+              }
+            })
+      )
       .contextMenu {
         Button("Open") { model.openImage(image.id) }
         Button("Pull latest") { Task { await model.changeImage(image, pull: true) } }
