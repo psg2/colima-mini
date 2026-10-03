@@ -41,12 +41,13 @@ jobs:
         uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
       - name: Run quality gates
         run: mise run ci
-  older-macos:
-    name: macOS 15 (${{ matrix.runner }})
+  minimum-macos:
+    name: Minimum macOS (${{ matrix.runner }})
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        # The oldest supported macOS on Apple Silicon, and Intel.
+        runner: [macos-14, macos-15-intel]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
@@ -55,5 +56,11 @@ jobs:
           persist-credentials: false
       - name: Install pinned repository tools
         uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
-      - name: Build and test on macOS 15 and Intel
+      # macOS 14 images default to Xcode 15 (Swift 5.10); the package needs Swift 6.
+      - name: Select the newest Xcode 16
+        run: |
+          xcode_path=$(find /Applications -maxdepth 1 -type d -name 'Xcode_16*.app' | sort -V | tail -1)
+          if [ -n "$xcode_path" ]; then sudo xcode-select -s "$xcode_path"; fi
+          swift --version
+      - name: Build and test on the minimum macOS and Intel
         run: mise run test

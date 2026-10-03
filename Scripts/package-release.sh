@@ -21,4 +21,11 @@ rm -rf "$OUTPUT"
 mkdir -p "$OUTPUT"
 ditto -c -k --sequesterRsrc --keepParent "$ROOT/build/Colima Mini.app" "$OUTPUT/$ARCHIVE"
 (cd "$OUTPUT" && shasum -a 256 "$ARCHIVE" >"$ARCHIVE.sha256")
+
+# Check what users download: the checksum, then the app inside the archive.
+(cd "$OUTPUT" && shasum -a 256 -c "$ARCHIVE.sha256" >/dev/null)
+EXTRACTED="$(mktemp -d)"
+trap 'rm -rf "$EXTRACTED"' EXIT
+ditto -x -k "$OUTPUT/$ARCHIVE" "$EXTRACTED"
+EXPECT_UNIVERSAL=1 "$ROOT/Scripts/test-app.sh" "$EXTRACTED/Colima Mini.app" >&2
 printf '%s\n' "$OUTPUT/$ARCHIVE"

@@ -9,7 +9,9 @@
    ```
 
 The release workflow checks that the tag matches `VERSION`, runs `mise run ci`,
-builds a universal app with `mise run package-release` in ad hoc mode, checks it again and
+builds a universal app with `mise run package-release` in ad hoc mode, extracts the
+archive and checks the app inside it (checksum, signature, version, minimum macOS
+and both architectures), and
 publishes the ZIP and its SHA-256 checksum with the release notes. You can also
 dispatch it by hand for an existing tag.
 
