@@ -15,6 +15,10 @@ mise run hooks
 Before opening a ready-for-review pull request, run `mise run check`. It runs
 the same gates as CI plus a Gitleaks scan. `mise run format` fixes formatting.
 
+Follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities as
+described in [SECURITY.md](SECURITY.md), not in public issues. [CONTEXT.md](CONTEXT.md)
+defines the terms the code and docs use.
+
 Describe the observable problem, resulting behavior, checks and any manual
 validation gap. Use tests that can catch realistic regressions through module
 interfaces. Avoid assertions about private call order or source structure.

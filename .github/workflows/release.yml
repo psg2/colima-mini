@@ -35,6 +35,8 @@ jobs:
       - name: Run quality gates
         run: mise run ci
       - name: Build universal release
+        env:
+          COLIMA_MINI_RELEASE_SIGNING: adhoc
         run: mise run package-release
       - name: Verify the universal app
         run: ./Scripts/test-app.sh
@@ -42,5 +44,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" build/*.zip build/*.sha256 \
+          gh release create "$RELEASE_TAG" build/release/*.zip build/release/*.sha256 \
             --verify-tag --title "$RELEASE_TAG" --notes-file docs/release-notes.md

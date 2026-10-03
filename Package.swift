@@ -6,9 +6,21 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [.executable(name: "ColimaMini", targets: ["ColimaMini"])],
     targets: [
-        .target(name: "ColimaCore", resources: [.copy("Resources/docker-sweep.py")]),
-        .target(name: "ColimaAppState", dependencies: ["ColimaCore"]),
-        .executableTarget(name: "ColimaMini", dependencies: ["ColimaCore", "ColimaAppState"]),
+        .target(
+            name: "ColimaCore",
+            resources: [.copy("Resources/docker-sweep.py")],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]
+        ),
+        .target(
+            name: "ColimaAppState",
+            dependencies: ["ColimaCore"],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]
+        ),
+        .executableTarget(
+            name: "ColimaMini",
+            dependencies: ["ColimaCore", "ColimaAppState"],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]
+        ),
         .testTarget(name: "ColimaAppStateTests", dependencies: ["ColimaAppState", "ColimaCore"]),
         .testTarget(
             name: "ColimaCoreTests", dependencies: ["ColimaCore"], resources: [.copy("Fixtures")]),

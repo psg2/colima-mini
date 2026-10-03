@@ -40,8 +40,8 @@ struct PortChip: View {
             Button("Copy \(port.address)") { Launcher.copy(port.address) }
             if port.protocolName == "tcp" {
                 Divider()
-                Button("Open as HTTP") { port.url(scheme: "http").map { NSWorkspace.shared.open($0) } }
-                Button("Open as HTTPS") { port.url(scheme: "https").map { NSWorkspace.shared.open($0) } }
+                Button("Open as HTTP") { if let url = port.url(scheme: "http") { NSWorkspace.shared.open(url) } }
+                Button("Open as HTTPS") { if let url = port.url(scheme: "https") { NSWorkspace.shared.open(url) } }
             }
         } label: {
             HStack(spacing: 2) {

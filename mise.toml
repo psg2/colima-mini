@@ -36,7 +36,7 @@ run = "python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' Sources
 description = "Run static checks"
 depends = ["lint:*"]
 
-[tasks.test]
+[tasks."test:unit"]
 description = "Run unit and integration tests, then the cleanup scanner tests"
 run = ["swift test", "./Scripts/test-sweep.sh"]
 
@@ -45,9 +45,14 @@ description = "Check the built app bundle, its scanner and a relocated copy"
 depends = ["build"]
 run = "./Scripts/test-app.sh"
 
+# Sequential, so SwiftPM never builds twice at once in the same .build directory.
+[tasks.test]
+description = "Run the unit tests, then the app bundle tests"
+run = ["mise run test:unit", "mise run test:app"]
+
 [tasks.ci]
 description = "Run the same quality gates as GitHub Actions"
-depends = ["lint", "test", "test:app"]
+depends = ["lint", "test"]
 
 [tasks.scan-secrets]
 description = "Scan the working tree and complete Git history with Gitleaks"
@@ -69,8 +74,12 @@ run = "./Scripts/build.sh --install"
 description = "Build and open the app; pass --fixture PATH for sample data"
 run = "./Scripts/run.sh"
 
+[tasks.uninstall]
+description = "Remove the installed app but keep its preferences"
+run = "./Scripts/uninstall-local.sh --app"
+
 [tasks.package-release]
-description = "Build the universal release ZIP and its checksum in build/"
+description = "Build the universal release ZIP and checksum in build/release (COLIMA_MINI_RELEASE_SIGNING=adhoc)"
 run = "./Scripts/package-release.sh"
 
 [tasks.clean]
