@@ -16,9 +16,11 @@ package final class Command: @unchecked Sendable {
         wake.signal()
         if let child, child.isRunning { child.terminate() }
     }
+    // `emptyStatus` is an exit status that means "nothing found" when the
+    // command printed nothing, as lsof's 1.
     package func execute(
         _ executable: String, _ arguments: [String], timeout: Double,
-        environment: [String: String], outputPolicy: OutputPolicy = .stdout
+        environment: [String: String], outputPolicy: OutputPolicy = .stdout, emptyStatus: Int32? = nil
     ) throws -> String {
         guard FileManager.default.isExecutableFile(atPath: executable) else {
             throw AppError.message(
@@ -100,6 +102,9 @@ package final class Command: @unchecked Sendable {
         }
         let text = try read(stdoutURL)
         let errorText = try read(stderrURL)
+        if let emptyStatus, child.terminationStatus == emptyStatus, text.isEmpty, errorText.isEmpty {
+            return ""
+        }
         guard child.terminationStatus == 0 else {
             throw AppError.message(
                 (outputPolicy == .combined ? text : errorText)
@@ -180,14 +185,14 @@ package final class Command: @unchecked Sendable {
     }
     package static func run(
         _ executable: String, _ arguments: [String], timeout: Double = 15,
-        environment: [String: String] = [:], outputPolicy: OutputPolicy = .stdout
+        environment: [String: String] = [:], outputPolicy: OutputPolicy = .stdout, emptyStatus: Int32? = nil
     ) async throws -> String {
         let command = Command()
         return try await withTaskCancellationHandler {
             try await Task.detached(priority: .utility) {
                 try command.execute(
                     executable, arguments, timeout: timeout, environment: environment,
-                    outputPolicy: outputPolicy)
+                    outputPolicy: outputPolicy, emptyStatus: emptyStatus)
             }.value
         } onCancel: {
             command.cancel()

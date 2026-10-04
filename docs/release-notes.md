@@ -8,10 +8,11 @@ Colima Mini is an unofficial native macOS dashboard for the default Colima profi
   and identified VM image allocation on the Mac. Unsupported data is explicit.
 - CPU and memory settings with deferred save or confirmed VM restart.
 - Matching llama menu bar icon and compact status panel.
-- Independent Swift package with a bundled read-only cleanup scanner.
+- Read-only scan for unused containers, built into the app. Python is no longer
+  required.
 - Universal Apple Silicon and Intel app, macOS 14 or later.
 
-Install Colima, Docker CLI and Python 3 separately. Releases are ad-hoc signed;
+Install Colima and the Docker CLI separately. Releases are ad-hoc signed;
 Apple Developer ID signing and notarization are not configured. See
 [first-open instructions](https://github.com/psg2/colima-mini#open-a-downloaded-release-for-the-first-time)
 for checksum verification and Apple's app-specific opening procedure.

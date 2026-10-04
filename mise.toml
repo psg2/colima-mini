@@ -28,20 +28,16 @@ run = "actionlint"
 description = "Validate the application property list"
 run = "plutil -lint Resources/Info.plist"
 
-[tasks."lint:python"]
-description = "Check that the bundled cleanup scanner parses"
-run = "python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' Sources/ColimaCore/Resources/docker-sweep.py"
-
 [tasks.lint]
 description = "Run static checks"
 depends = ["lint:*"]
 
 [tasks."test:unit"]
-description = "Run unit and integration tests, then the cleanup scanner tests"
-run = ["swift test", "./Scripts/test-sweep.sh"]
+description = "Run the Swift package tests"
+run = "swift test"
 
 [tasks."test:app"]
-description = "Check the built app bundle, its scanner and a relocated copy"
+description = "Check the built app bundle and a relocated copy"
 depends = ["build"]
 run = "./Scripts/test-app.sh"
 

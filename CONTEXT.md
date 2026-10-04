@@ -18,7 +18,7 @@ _Avoid_: Dead project, stale project
 
 **Unused containers**:
 The result of a scan that gives each project a verdict: folder deleted, stopped for over a day, idle, quiet, or in use. The scan changes nothing.
-_Avoid_: Sweep (the scanner's internal name)
+_Avoid_: Sweep (the code's internal name)
 
 **Reclaim space**:
 A preview of removable Docker objects by kind, followed by a confirmed removal of exactly the listed items. Never includes named volumes.

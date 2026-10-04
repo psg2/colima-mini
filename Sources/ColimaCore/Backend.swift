@@ -131,41 +131,36 @@ package struct Backend {
         }
     }
     package func sweep() async throws -> String {
-        if let fixture { return fixture.sweep ?? "Nothing to clean up." }
-        return try await runScanner([])
+        UnusedContainerScan.report(try await unusedContainers())
     }
-    // The same scan as `sweep()`, structured. It never changes containers.
-    package func unusedContainers() async throws -> [SweepGroup] {
+    // Compares network I/O over `sample` seconds. It never changes containers.
+    package func unusedContainers(sample: Double = 2) async throws -> [SweepGroup] {
         if let fixture { return fixture.sweepGroups ?? [] }
-        let output = try await runScanner(["--json"])
+        let ids = try await docker(["ps", "-aq"]).split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !ids.isEmpty else { return [] }
+        let containers: [UnusedContainerScan.Inspected]
         do {
-            return try JSONDecoder().decode([SweepGroup].self, from: Data(output.utf8))
+            containers = try JSONDecoder().decode(
+                [UnusedContainerScan.Inspected].self, from: Data(try await docker(["inspect"] + ids).utf8))
+        } catch let error as AppError {
+            throw error
         } catch {
-            throw AppError.message("The cleanup scanner returned an unreadable report.")
+            throw AppError.message("Docker returned container details Colima Mini can't read.")
         }
-    }
-    private func runScanner(_ arguments: [String]) async throws -> String {
-        let bundle: Bundle
-        if Bundle.main.bundleURL.pathExtension == "app" {
-            guard
-                let url = Bundle.main.url(forResource: "ColimaMini_ColimaCore", withExtension: "bundle"),
-                let packaged = Bundle(url: url)
-            else {
-                throw AppError.message(
-                    "The cleanup scanner is missing from this app. Reinstall Colima Mini.")
-            }
-            bundle = packaged
-        } else {
-            bundle = Bundle.module
+        let statsArguments = ["stats", "--no-stream", "--format", "{{.ID}}\t{{.NetIO}}"]
+        let before = UnusedContainerScan.networkIO(stats: try await docker(statsArguments))
+        try await Task.sleep(nanoseconds: UInt64(sample * 1_000_000_000))
+        let after = UnusedContainerScan.networkIO(stats: try await docker(statsArguments))
+        let lsof = try await Command.run(
+            toolchain.executable("lsof"), ["-nP", "-iTCP", "-sTCP:ESTABLISHED"],
+            environment: toolchain.environment, emptyStatus: 1)
+        return try await UnusedContainerScan.classify(
+            containers, clients: UnusedContainerScan.hostClients(lsof: lsof),
+            traffic: UnusedContainerScan.traffic(before: before, after: after)
+        ) { id in
+            // Many images, Postgres included, log to stderr.
+            let line = try await docker(["logs", "--timestamps", "--tail", "1", id], outputPolicy: .combined)
+            return DockerDate.parse(line.split(separator: " ", maxSplits: 1).first.map(String.init))
         }
-        guard let script = bundle.url(forResource: "docker-sweep", withExtension: "py") else {
-            throw AppError.message("The cleanup scanner is missing from this app. Reinstall Colima Mini.")
-        }
-        var environment = toolchain.environment
-        environment["DOCKER_CONTEXT"] = "colima"
-        environment["DOCKER_SWEEP_DOCKER"] = try toolchain.executable("docker")
-        return try await Command.run(
-            toolchain.executable("python3"), [script.path, "--sample", "2"] + arguments, timeout: 45,
-            environment: environment)
     }
 }

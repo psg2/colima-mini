@@ -6,7 +6,6 @@ flowchart LR
     State --> Core[ColimaCore]
     Core --> CLIs[Installed Docker and Colima CLIs]
     Core --> Config[Local resource configuration]
-    Core --> Scanner[Bundled read-only cleanup scanner]
     Tests[Core tests with temporary configs and local runtimes] --> Core
 ```
 
@@ -19,7 +18,7 @@ Sources/ColimaMini/        App entry point and SwiftUI views
 Tests/ColimaCoreTests/     Parser, process, config and runtime integration tests
 Tests/ColimaAppStateTests/ Navigation and state tests
 Resources/                 Info.plist and the application icon source
-Scripts/                   Build, bundle checks, scanner tests and packaging
+Scripts/                   Build, bundle checks and packaging
 .github/workflows/         CI and tag-based releases
 ```
 
@@ -27,7 +26,8 @@ Scripts/                   Build, bundle checks, scanner tests and packaging
 the `.app` bundle. It copies `Resources/Info.plist` and stamps the version from
 `VERSION` into it, builds the icon set and signs the bundle ad hoc.
 
-Every Docker command passes `--context colima`. The app bundles its cleanup
-scanner, a Python 3 script that uses only the standard library. Subprocess output
-goes to private temporary files that the app deletes when the command finishes.
+Every Docker command passes `--context colima`. The unused-container scan reads
+`docker inspect`, `docker stats`, `docker logs` and `lsof`, and changes nothing.
+Subprocess output goes to private temporary files that the app deletes when the
+command finishes.
 Logs never leave the Mac.

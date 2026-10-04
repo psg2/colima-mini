@@ -22,8 +22,8 @@ mise run hooks   # pre-push hook that runs `mise run check`
 | `mise run uninstall` | Removes the installed app and keeps its preferences |
 | `mise run run` | Builds and opens the app; add `--fixture PATH` for sample data |
 | `mise run format` | Rewrites Swift sources with swift-format |
-| `mise run lint` | Formatting, ShellCheck, actionlint, Info.plist and the Python scanner |
-| `mise run test:unit` | `swift test` and the cleanup scanner tests |
+| `mise run lint` | Formatting, ShellCheck, actionlint and Info.plist |
+| `mise run test:unit` | `swift test` |
 | `mise run test:app` | Builds, then checks the bundle and a relocated copy |
 | `mise run test` | `test:unit`, then `test:app` |
 | `mise run ci` | `lint` and `test`, as CI runs them |
@@ -50,9 +50,9 @@ APP="build/Colima Mini.app/Contents/MacOS/ColimaMini"
 "$APP" --reclaim-plan  # what Reclaim space would offer
 ```
 
-The app finds `docker`, `colima` and `python3` through `PATH` and the usual
-Homebrew locations. `COLIMA_MINI_DOCKER`, `COLIMA_MINI_COLIMA` and
-`COLIMA_MINI_PYTHON3` override them with absolute paths. `COLIMA_HOME` picks the
+The app finds `docker`, `colima` and `lsof` through `PATH` and the usual
+Homebrew and system locations. `COLIMA_MINI_DOCKER`, `COLIMA_MINI_COLIMA` and
+`COLIMA_MINI_LSOF` override them with absolute paths. `COLIMA_HOME` picks the
 profile directory.
 
 ## Tests
