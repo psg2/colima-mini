@@ -1,9 +1,9 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ColimaCore
 
-final class NetworkTests: XCTestCase {
+struct NetworkTests {
     private func run(body: (Backend, () throws -> [String]) async throws -> Void) async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "colima-networks-" + UUID().uuidString)
@@ -58,33 +58,32 @@ final class NetworkTests: XCTestCase {
         }
     }
 
-    func testNetworksListMembersProjectsAndSubnetsWithBuiltInsLast() async throws {
+    @Test func networksListMembersProjectsAndSubnetsWithBuiltInsLast() async throws {
         try await run { backend, _ in
             let networks = try await backend.networks()
-            XCTAssertEqual(networks.map(\.name), ["app_default", "old_default", "bridge"])
+            #expect(networks.map(\.name) == ["app_default", "old_default", "bridge"])
             let app = networks[0]
-            XCTAssertEqual(app.project, "app")
-            XCTAssertEqual(app.subnets, ["172.19.0.0/16"])
-            XCTAssertEqual(
-                app.members,
-                [
+            #expect(app.project == "app")
+            #expect(app.subnets == ["172.19.0.0/16"])
+            #expect(
+                app.members == [
                     DockerNetwork.Member(id: "c1", name: "app-db-1", address: nil),
                     DockerNetwork.Member(id: "c2", name: "app-web-1", address: "172.19.0.3/16"),
                 ])
-            XCTAssertEqual(networks[1].members, [])
-            XCTAssertTrue(networks[2].builtin)
+            #expect(networks[1].members == [])
+            #expect(networks[2].builtin)
         }
     }
 
-    func testRemovalNeverForcesAndRefusesBuiltIns() async throws {
+    @Test func removalNeverForcesAndRefusesBuiltIns() async throws {
         try await run { backend, commands in
             let networks = try await backend.networks()
             try await backend.removeNetwork(networks[1])
             do {
                 try await backend.removeNetwork(networks[2])
-                XCTFail("Removed a built-in network")
+                Issue.record("Removed a built-in network")
             } catch {}
-            XCTAssertEqual(try commands(), ["network rm id-old"])
+            #expect(try commands() == ["network rm id-old"])
         }
     }
 }

@@ -1,9 +1,9 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ColimaCore
 
-final class UnusedContainersTests: XCTestCase {
+struct UnusedContainersTests {
     // Fake docker and lsof executables serve a fixed set of containers. Any
     // docker command other than a read is recorded in `changes` and fails.
     private let docker = #"""
@@ -123,37 +123,36 @@ final class UnusedContainersTests: XCTestCase {
         return (groups, changes)
     }
 
-    func testScanGivesEachGroupAVerdictWithoutChangingContainers() async throws {
+    @Test func scanGivesEachGroupAVerdictWithoutChangingContainers() async throws {
         let (groups, changes) = try await scan()
 
-        XCTAssertEqual(
-            groups.map { "\($0.verdict.rawValue) \($0.name)" },
-            [
+        #expect(
+            groups.map { "\($0.verdict.rawValue) \($0.name)" } == [
                 "orphan gone", "stale stale", "idle old", "recent fresh-pg", "active busy-pg", "active chatty",
                 "stopped paused-pg",
             ])
         let byName = Dictionary(uniqueKeysWithValues: groups.map { ($0.name, $0) })
-        XCTAssertEqual(byName["gone"]?.containerIDs, ["orphan000001", "orphan000002"])
-        XCTAssertEqual(byName["gone"]?.project, "gone")
-        XCTAssertEqual(byName["gone"]?.reason, "folder gone: /nonexistent/worktree")
-        XCTAssertEqual(byName["busy-pg"]?.reason, "clients: node(31993)")
-        XCTAssertEqual(byName["chatty"]?.reason, "network traffic during sample")
-        XCTAssertEqual(byName["old"]?.reason, "no clients, no traffic, quiet for 3d")
-        XCTAssertEqual(byName["fresh-pg"]?.reason, "no clients, no traffic, last log 10m ago")
-        XCTAssertEqual(byName["stale"]?.reason, "not running for 8d")
-        XCTAssertEqual(byName["paused-pg"]?.reason, "stopped 30m ago")
-        XCTAssertNil(byName["paused-pg"]?.project)
-        XCTAssertNil(changes, "the scan changed containers")
+        #expect(byName["gone"]?.containerIDs == ["orphan000001", "orphan000002"])
+        #expect(byName["gone"]?.project == "gone")
+        #expect(byName["gone"]?.reason == "folder gone: /nonexistent/worktree")
+        #expect(byName["busy-pg"]?.reason == "clients: node(31993)")
+        #expect(byName["chatty"]?.reason == "network traffic during sample")
+        #expect(byName["old"]?.reason == "no clients, no traffic, quiet for 3d")
+        #expect(byName["fresh-pg"]?.reason == "no clients, no traffic, last log 10m ago")
+        #expect(byName["stale"]?.reason == "not running for 8d")
+        #expect(byName["paused-pg"]?.reason == "stopped 30m ago")
+        #expect(byName["paused-pg"]?.project == nil)
+        #expect(changes == nil, "the scan changed containers")
     }
 
-    func testScanAcceptsLsofFindingNoConnections() async throws {
+    @Test func scanAcceptsLsofFindingNoConnections() async throws {
         let (groups, _) = try await scan(["FAKE_LSOF_MODE": "empty"])
 
-        XCTAssertEqual(groups.first { $0.name == "busy-pg" }?.verdict, .idle)
+        #expect(groups.first { $0.name == "busy-pg" }?.verdict == .idle)
     }
 
     // A failed probe must not look like an empty or idle result.
-    func testScanFailsWhenAProbeFails() async throws {
+    @Test func scanFailsWhenAProbeFails() async throws {
         let failures: [[String: String]] =
             ["ps", "inspect", "stats", "logs"].map { ["FAKE_DOCKER_FAIL": $0] } + [
                 ["FAKE_LSOF_MODE": "fail"]
@@ -161,23 +160,23 @@ final class UnusedContainersTests: XCTestCase {
         for failure in failures {
             do {
                 _ = try await scan(failure)
-                XCTFail("\(failure) was accepted")
+                Issue.record("\(failure) was accepted")
             } catch {
-                XCTAssertTrue(error.localizedDescription.contains("synthetic"), "\(failure): \(error)")
+                #expect(error.localizedDescription.contains("synthetic"), "\(failure): \(error)")
             }
         }
     }
 
-    func testReportListsVerdictsAndWhatCanBeCleanedUp() {
+    @Test func reportListsVerdictsAndWhatCanBeCleanedUp() {
         let report = UnusedContainerScan.report([
             SweepGroup(verdict: .stale, name: "worker", project: nil, reason: "not running for 2d", containerIDs: ["c"]),
             SweepGroup(
                 verdict: .recent, name: "demo", project: "demo", reason: "last log 5m ago", containerIDs: ["a", "b"]),
         ])
 
-        XCTAssertTrue(report.contains("stale    worker "))
-        XCTAssertTrue(report.contains("recent   demo (2) "))
-        XCTAssertTrue(report.hasSuffix("1 orphan or stale group(s) can be removed and 0 idle group(s) stopped."))
-        XCTAssertEqual(UnusedContainerScan.report([]), "No containers.")
+        #expect(report.contains("stale    worker "))
+        #expect(report.contains("recent   demo (2) "))
+        #expect(report.hasSuffix("1 orphan or stale group(s) can be removed and 0 idle group(s) stopped."))
+        #expect(UnusedContainerScan.report([]) == "No containers.")
     }
 }

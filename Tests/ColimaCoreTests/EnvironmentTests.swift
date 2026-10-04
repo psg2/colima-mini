@@ -1,9 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 
 @testable import ColimaCore
 
-final class EnvironmentTests: XCTestCase {
-    func testCredentialsAreMaskedAndOrdinarySettingsAreNot() {
+struct EnvironmentTests {
+    @Test func credentialsAreMaskedAndOrdinarySettingsAreNot() {
         let variables = EnvironmentVariable.parse([
             "POSTGRES_PASSWORD=hunter2", "AWS_SECRET_ACCESS_KEY=abc", "GITHUB_TOKEN=ghp_x",
             "STRIPE_API_KEY=sk", "DB_PASS=x", "JWT_PRIVATE_KEY=-----BEGIN",
@@ -14,18 +15,16 @@ final class EnvironmentTests: XCTestCase {
             "AUTH_HEADER=Bearer x", "LANG=C.UTF-8",
         ])
         let masked = Set(variables.filter(\.sensitive).map(\.name))
-        XCTAssertEqual(
-            masked,
-            [
+        #expect(
+            masked == [
                 "POSTGRES_PASSWORD", "AWS_SECRET_ACCESS_KEY", "GITHUB_TOKEN", "STRIPE_API_KEY", "DB_PASS",
                 "JWT_PRIVATE_KEY", "SENTRY_DSN", "DATABASE_URL", "AUTH_HEADER",
             ])
     }
 
-    func testValuesKeepEverythingAfterTheFirstEqualsSign() {
-        XCTAssertEqual(
-            EnvironmentVariable.parse(["OPTS=-Da=b -Dc=d", "EMPTY=", "BARE"]),
-            [
+    @Test func valuesKeepEverythingAfterTheFirstEqualsSign() {
+        #expect(
+            EnvironmentVariable.parse(["OPTS=-Da=b -Dc=d", "EMPTY=", "BARE"]) == [
                 EnvironmentVariable(name: "OPTS", value: "-Da=b -Dc=d"),
                 EnvironmentVariable(name: "EMPTY", value: ""),
                 EnvironmentVariable(name: "BARE", value: ""),

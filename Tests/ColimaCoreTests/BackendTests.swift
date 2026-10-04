@@ -1,9 +1,9 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ColimaCore
 
-final class BackendTests: XCTestCase {
+struct BackendTests {
     // Real subprocesses provide a small local runtime. Assertions inspect the
     // resulting VM/container state rather than the order of implementation calls.
     // The fake runtime keeps its state as files in `state/`: `vm`, one `docker ps`
@@ -108,86 +108,83 @@ final class BackendTests: XCTestCase {
     private func state(_ config: URL, _ name: String) -> URL {
         config.deletingLastPathComponent().appendingPathComponent("state").appendingPathComponent(name)
     }
-    func testSnapshotUsesColimaDespiteForeignEnvironment() async throws {
+    @Test func snapshotUsesColimaDespiteForeignEnvironment() async throws {
         try await runtime { backend, _ in
             let snapshot = try await backend.snapshot()
-            XCTAssertEqual(snapshot.containers.count, 3)
-            XCTAssertEqual(snapshot.vm.status, "Running")
+            #expect(snapshot.containers.count == 3)
+            #expect(snapshot.vm.status == "Running")
         }
     }
-    func testResourceRestartRestoresOnlyPreviouslyRunningContainers() async throws {
+    @Test func resourceRestartRestoresOnlyPreviouslyRunningContainers() async throws {
         try await runtime { backend, config in
             let before = try await backend.snapshot()
             let desired = ResourceSettings(cpus: 1, memoryGiB: 2.5, diskGiB: 120)
             try await backend.apply(desired, restart: true)
             let after = try await backend.snapshot()
-            XCTAssertEqual(after.vm.cpus, 1)
-            XCTAssertEqual(after.vm.disk, 120 << 30)
-            XCTAssertEqual(after.vm.memory, Int64(2.5 * 1_073_741_824))
-            XCTAssertEqual(
-                Set(after.containers.filter(\.running).map(\.id)),
-                Set(before.containers.filter(\.running).map(\.id)))
-            XCTAssertTrue(try String(contentsOf: config, encoding: .utf8).contains("autoActivate: true"))
+            #expect(after.vm.cpus == 1)
+            #expect(after.vm.disk == 120 << 30)
+            #expect(after.vm.memory == Int64(2.5 * 1_073_741_824))
+            #expect(Set(after.containers.filter(\.running).map(\.id)) == Set(before.containers.filter(\.running).map(\.id)))
+            #expect(try String(contentsOf: config, encoding: .utf8).contains("autoActivate: true"))
         }
     }
-    func testSaveForNextStartLeavesRunningAllocationUntouched() async throws {
+    @Test func saveForNextStartLeavesRunningAllocationUntouched() async throws {
         try await runtime { backend, _ in
             let before = try await backend.snapshot()
             let desired = ResourceSettings(cpus: 1, memoryGiB: 2, diskGiB: 100)
             try await backend.apply(desired, restart: false)
             let after = try await backend.snapshot()
-            XCTAssertEqual(try backend.settings(), desired)
-            XCTAssertEqual(after.vm.cpus, before.vm.cpus)
-            XCTAssertEqual(
-                after.containers.filter(\.running).map(\.id), before.containers.filter(\.running).map(\.id))
+            #expect(try backend.settings() == desired)
+            #expect(after.vm.cpus == before.vm.cpus)
+            #expect(after.containers.filter(\.running).map(\.id) == before.containers.filter(\.running).map(\.id))
         }
     }
-    func testContainerLogsIncludeBothStreams() async throws {
+    @Test func containerLogsIncludeBothStreams() async throws {
         try await runtime { backend, _ in
             var logs = ""
             for try await chunk in backend.followLogs("sample") { logs += chunk }
-            XCTAssertTrue(logs.contains("stdout log"))
-            XCTAssertTrue(logs.contains("stderr log"))
-            XCTAssertEqual(
-                logs,
-                "2026-10-02T12:00:00Z stdout log\n2026-10-02T12:00:01Z stderr log\n2026-10-02T12:00:01Z equal timestamp\nmultiline body\n"
+            #expect(logs.contains("stdout log"))
+            #expect(logs.contains("stderr log"))
+            #expect(
+                logs
+                    == "2026-10-02T12:00:00Z stdout log\n2026-10-02T12:00:01Z stderr log\n2026-10-02T12:00:01Z equal timestamp\nmultiline body\n"
             )
         }
     }
-    func testProjectLogsLabelWholeLinesFromEverySource() async throws {
+    @Test func projectLogsLabelWholeLinesFromEverySource() async throws {
         try await runtime { backend, _ in
             var text = ""
             for try await chunk in backend.followProjectLogs([
                 LogSource(id: "sample", label: "db"), LogSource(id: "split", label: "web"),
             ]) { text += chunk }
             let lines = text.split(separator: "\n").map(String.init)
-            XCTAssertTrue(lines.contains("2026-10-02T12:00:02Z [web] hello from split"))
-            XCTAssertTrue(lines.contains("2026-10-02T12:00:00Z [db] stdout log"))
-            XCTAssertTrue(lines.contains("2026-10-02T12:00:01Z [db] stderr log"))
+            #expect(lines.contains("2026-10-02T12:00:02Z [web] hello from split"))
+            #expect(lines.contains("2026-10-02T12:00:00Z [db] stdout log"))
+            #expect(lines.contains("2026-10-02T12:00:01Z [db] stderr log"))
             // A continuation line without a timestamp still names its source.
-            XCTAssertTrue(lines.contains("[db] multiline body"))
-            XCTAssertEqual(lines.count, 5)
+            #expect(lines.contains("[db] multiline body"))
+            #expect(lines.count == 5)
         }
     }
-    func testStoppingAFollowTerminatesTheLogProcess() async throws {
+    @Test func stoppingAFollowTerminatesTheLogProcess() async throws {
         try await runtime { backend, config in
             var stream = backend.followLogs("endless").makeAsyncIterator()
             let first = try await stream.next()
-            XCTAssertEqual(first, "2026-10-02T12:00:00Z first line\n")
+            #expect(first == "2026-10-02T12:00:00Z first line\n")
             let pidFile = config.deletingLastPathComponent().appendingPathComponent("follower.pid")
-            let pid = try XCTUnwrap(Int32(String(contentsOf: pidFile, encoding: .utf8)))
+            let pid = try #require(Int32(String(contentsOf: pidFile, encoding: .utf8)))
             stream = backend.followLogs("sample").makeAsyncIterator()
             let deadline = Date().addingTimeInterval(4)
             while kill(pid, 0) == 0 && Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
-            XCTAssertNotEqual(kill(pid, 0), 0, "The follower outlived its stream")
+            #expect(kill(pid, 0) != 0, "The follower outlived its stream")
         }
     }
-    func testResourceRestartCapturesExternallyChangedRunningSet() async throws {
+    @Test func resourceRestartCapturesExternallyChangedRunningSet() async throws {
         try await runtime { backend, config in
             let containers = state(config, "containers")
             let text = try String(contentsOf: containers, encoding: .utf8)
             let rows = try Snapshot.lines(text, as: Container.self)
-            let previouslyStopped = try XCTUnwrap(rows.first { !$0.running })
+            let previouslyStopped = try #require(rows.first { !$0.running })
             let encoded = try text.split(separator: "\n").map { original -> String in
                 var value = try JSONSerialization.jsonObject(with: Data(original.utf8)) as! [String: Any]
                 value["State"] = value["ID"] as? String == previouslyStopped.id ? "running" : "exited"
@@ -198,29 +195,29 @@ final class BackendTests: XCTestCase {
             try Data((encoded.joined(separator: "\n") + "\n").utf8).write(to: containers)
             try await backend.apply(ResourceSettings(cpus: 1, memoryGiB: 2), restart: true)
             let after = try await backend.snapshot()
-            XCTAssertEqual(Set(after.containers.filter(\.running).map(\.id)), [previouslyStopped.id])
+            #expect(Set(after.containers.filter(\.running).map(\.id)) == [previouslyStopped.id])
         }
     }
-    func testResourceRestartReportsMissingOrUnrestoredContainers() async throws {
+    @Test func resourceRestartReportsMissingOrUnrestoredContainers() async throws {
         for failure in ["remove_on_start", "fail_restore"] {
             try await runtime { backend, config in
                 let before = try await backend.snapshot()
-                let running = try XCTUnwrap(before.containers.first { $0.running })
+                let running = try #require(before.containers.first { $0.running })
                 try Data(running.id.utf8).write(to: state(config, failure))
                 do {
                     try await backend.apply(
                         ResourceSettings(cpus: 1, memoryGiB: 2), restart: true)
-                    XCTFail("Partial restoration was accepted")
+                    Issue.record("Partial restoration was accepted")
                 } catch {
-                    XCTAssertTrue(error.localizedDescription.contains("restoration is incomplete"))
+                    #expect(error.localizedDescription.contains("restoration is incomplete"))
                 }
                 let after = try await backend.snapshot()
-                XCTAssertEqual(after.vm.cpus, 1)
-                XCTAssertFalse(after.containers.contains { $0.id == running.id && $0.running })
+                #expect(after.vm.cpus == 1)
+                #expect(!(after.containers.contains { $0.id == running.id && $0.running }))
             }
         }
     }
-    func testResourceRestartDoesNotDependOnMetricsAvailability() async throws {
+    @Test func resourceRestartDoesNotDependOnMetricsAvailability() async throws {
         try await runtime { backend, config in
             let before = try await backend.snapshot()
             try Data().write(to: state(config, "fail_stats"))
@@ -229,10 +226,8 @@ final class BackendTests: XCTestCase {
             let after = try Snapshot.decode(
                 vm: String(contentsOf: state(config, "vm"), encoding: .utf8),
                 containers: String(contentsOf: state(config, "containers"), encoding: .utf8), stats: "")
-            XCTAssertEqual(after.vm.cpus, 1)
-            XCTAssertEqual(
-                Set(after.containers.filter(\.running).map(\.id)),
-                Set(before.containers.filter(\.running).map(\.id)))
+            #expect(after.vm.cpus == 1)
+            #expect(Set(after.containers.filter(\.running).map(\.id)) == Set(before.containers.filter(\.running).map(\.id)))
         }
     }
 }

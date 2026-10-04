@@ -1,9 +1,9 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ColimaCore
 
-final class CleanupTests: XCTestCase {
+struct CleanupTests {
     private static let accounting: [String: Any] = [
         "Containers": [
             [
@@ -77,47 +77,46 @@ final class CleanupTests: XCTestCase {
         try await body(Backend(toolchain: Toolchain(environment: env)), record)
     }
 
-    func testPlanListsOnlyUnreferencedObjectsAndNeverNamedVolumes() async throws {
+    @Test func planListsOnlyUnreferencedObjectsAndNeverNamedVolumes() async throws {
         try await run { backend, _ in
             let plan = try await backend.cleanupPlan()
             func ids(_ kind: CleanupKind) -> [String] { plan.category(kind)?.items.map(\.id) ?? [] }
-            XCTAssertEqual(ids(.stoppedContainers), ["stopped1"])
-            XCTAssertEqual(ids(.danglingImages), ["sha256:abcdef1234567890"])
-            XCTAssertEqual(ids(.unusedImages), ["redis:7-alpine"])
-            XCTAssertEqual(ids(.buildCache), ["cache1"])
-            XCTAssertEqual(ids(.networks), ["net1"])
-            XCTAssertEqual(ids(.anonymousVolumes), ["anon1", "anon2"])
-            XCTAssertFalse(plan.categories.flatMap(\.items).contains { $0.id == "demo_db" })
-            XCTAssertEqual(plan.category(.danglingImages)?.bytes, 200_000_000)
+            #expect(ids(.stoppedContainers) == ["stopped1"])
+            #expect(ids(.danglingImages) == ["sha256:abcdef1234567890"])
+            #expect(ids(.unusedImages) == ["redis:7-alpine"])
+            #expect(ids(.buildCache) == ["cache1"])
+            #expect(ids(.networks) == ["net1"])
+            #expect(ids(.anonymousVolumes) == ["anon1", "anon2"])
+            #expect(!(plan.categories.flatMap(\.items).contains { $0.id == "demo_db" }))
+            #expect(plan.category(.danglingImages)?.bytes == 200_000_000)
         }
     }
 
-    func testReclaimRemovesOnlyPreviewedItemsOfSelectedKindsAndReportsRefusals() async throws {
+    @Test func reclaimRemovesOnlyPreviewedItemsOfSelectedKindsAndReportsRefusals() async throws {
         try await run { backend, record in
             let plan = try await backend.cleanupPlan()
             let result = try await backend.reclaim(
                 plan, kinds: [.danglingImages, .anonymousVolumes, .buildCache])
             let commands = try String(contentsOf: record, encoding: .utf8)
                 .split(separator: "\n").map(String.init)
-            XCTAssertEqual(
-                commands,
-                [
+            #expect(
+                commands == [
                     "image rm sha256:abcdef1234567890", "builder prune --force", "volume rm anon1",
                     "volume rm anon2",
                 ])
-            XCTAssertEqual(result.removed[.danglingImages], 1)
-            XCTAssertEqual(result.removed[.anonymousVolumes], 1)
-            XCTAssertEqual(result.failures.count, 1)
-            XCTAssertTrue(result.failures[0].contains("in use"))
-            XCTAssertEqual(result.reclaimedBytes, 200_000_000 + 94_370_000 + 10_000_000, accuracy: 1)
+            #expect(result.removed[.danglingImages] == 1)
+            #expect(result.removed[.anonymousVolumes] == 1)
+            #expect(result.failures.count == 1)
+            #expect(result.failures[0].contains("in use"))
+            #expect(abs(result.reclaimedBytes - (200_000_000 + 94_370_000 + 10_000_000)) <= 1)
         }
     }
 
-    func testSampleModeNeverPlansOrRemoves() async throws {
+    @Test func sampleModeNeverPlansOrRemoves() async throws {
         let backend = Backend(fixture: try SnapshotTests().fixture())
         do {
             _ = try await backend.cleanupPlan()
-            XCTFail("Sample mode produced a cleanup plan")
+            Issue.record("Sample mode produced a cleanup plan")
         } catch {}
         let plan = CleanupPlan(
             measuredAt: Date(),
@@ -127,7 +126,7 @@ final class CleanupTests: XCTestCase {
             ])
         do {
             _ = try await backend.reclaim(plan, kinds: [.danglingImages])
-            XCTFail("Sample mode removed objects")
+            Issue.record("Sample mode removed objects")
         } catch {}
     }
 }
