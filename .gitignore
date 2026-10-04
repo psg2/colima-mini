@@ -1,5 +1,4 @@
 .build/
-.build-app/
 .swiftpm/
 build/
 .local/

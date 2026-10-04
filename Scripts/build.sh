@@ -10,8 +10,8 @@ for argument in "$@"; do
     *) echo "Usage: $0 [--universal] [--install]" >&2; exit 1 ;;
   esac
 done
-VERSION="$(cat "$ROOT/VERSION")"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid VERSION.' >&2; exit 1; }
+VERSION="$(tr -d '[:space:]' <"$ROOT/VERSION")"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'VERSION must look like 1.2.3.' >&2; exit 1; }
 mkdir -p "$ROOT/build"
 STAGING="$(mktemp -d "$ROOT/build/.app-build.XXXXXX")"
 trap 'rm -rf "$STAGING"' EXIT
@@ -22,7 +22,7 @@ if $UNIVERSAL; then ARCHITECTURES=(arm64 x86_64); fi
 BINARIES=()
 for architecture in "${ARCHITECTURES[@]}"; do
   TRIPLE="$architecture-apple-macosx14.0"
-  SCRATCH="$ROOT/.build-app/$architecture"
+  SCRATCH="$ROOT/.build/release-$architecture"
   swift build --package-path "$ROOT" --scratch-path "$SCRATCH" -c release --product ColimaMini --triple "$TRIPLE" >&2
   BIN_DIR="$(swift build --package-path "$ROOT" --scratch-path "$SCRATCH" -c release --triple "$TRIPLE" --show-bin-path)"
   BINARIES+=("$BIN_DIR/ColimaMini")

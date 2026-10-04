@@ -84,4 +84,4 @@ run = "./Scripts/package-release.sh"
 
 [tasks.clean]
 description = "Remove generated build artifacts"
-run = "rm -rf build .build .build-app"
+run = "rm -rf build .build"
