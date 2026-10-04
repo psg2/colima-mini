@@ -1,9 +1,9 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ColimaCore
 
-final class ComposeTests: XCTestCase {
+struct ComposeTests {
     private func run(
         folder exists: Bool, body: (Backend, URL, () throws -> [String]) async throws -> Void
     ) async throws {
@@ -49,15 +49,14 @@ final class ComposeTests: XCTestCase {
         try await body(Backend(toolchain: Toolchain(environment: env)), project, commands)
     }
 
-    func testUpRunsInTheProjectFolderWithEveryComposeFile() async throws {
+    @Test func upRunsInTheProjectFolderWithEveryComposeFile() async throws {
         try await run(folder: true) { backend, folder, commands in
             let project = try await backend.composeProject("demo", containerID: "abc123")
             try await backend.compose(.up, project: project)
             let arguments = try JSONDecoder().decode(
-                [String].self, from: Data(try XCTUnwrap(commands().first).utf8))
-            XCTAssertEqual(
-                arguments,
-                [
+                [String].self, from: Data(try #require(commands().first).utf8))
+            #expect(
+                arguments == [
                     "compose", "--project-name", "demo", "--project-directory", folder.path,
                     "--file", folder.appendingPathComponent("compose.yaml").path,
                     "--file", folder.appendingPathComponent("compose.override.yaml").path,
@@ -66,27 +65,28 @@ final class ComposeTests: XCTestCase {
         }
     }
 
-    func testDownWithVolumesWorksAfterTheFolderIsDeletedButUpDoesNot() async throws {
+    @Test func downWithVolumesWorksAfterTheFolderIsDeletedButUpDoesNot() async throws {
         try await run(folder: false) { backend, _, commands in
             let project = try await backend.composeProject("demo", containerID: "abc123")
             do {
                 try await backend.compose(.up, project: project)
-                XCTFail("Up ran without compose files")
+                Issue.record("Up ran without compose files")
             } catch {}
-            XCTAssertEqual(try commands(), [])
+            let recorded = try commands()
+            #expect(recorded.isEmpty)
             try await backend.compose(.downVolumes, project: project)
-            XCTAssertEqual(
-                try commands(), [#"["compose", "--project-name", "demo", "down", "--volumes"]"#])
+            #expect(try commands() == [#"["compose", "--project-name", "demo", "down", "--volumes"]"#])
         }
     }
 
-    func testAContainerFromAnotherProjectIsRejected() async throws {
+    @Test func aContainerFromAnotherProjectIsRejected() async throws {
         try await run(folder: true) { backend, _, commands in
             do {
                 _ = try await backend.composeProject("other", containerID: "abc123")
-                XCTFail("Accepted a container from another project")
+                Issue.record("Accepted a container from another project")
             } catch {}
-            XCTAssertEqual(try commands(), [])
+            let recorded = try commands()
+            #expect(recorded.isEmpty)
         }
     }
 }

@@ -1,10 +1,10 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ColimaCore
 
-final class VolumeRemovalTests: XCTestCase {
-    func testRemovalNeverForcesAndRejectsOptionLikeNames() async throws {
+struct VolumeRemovalTests {
+    @Test func removalNeverForcesAndRejectsOptionLikeNames() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "colima-volumes-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -28,15 +28,13 @@ final class VolumeRemovalTests: XCTestCase {
         for invalid in ["", "--force"] {
             do {
                 try await backend.removeVolume(invalid)
-                XCTFail("Accepted \(invalid)")
+                Issue.record("Accepted \(invalid)")
             } catch {}
         }
-        XCTAssertEqual(
-            try String(contentsOf: record, encoding: .utf8).split(separator: "\n").map(String.init),
-            ["volume rm old_db"])
+        #expect(try String(contentsOf: record, encoding: .utf8).split(separator: "\n").map(String.init) == ["volume rm old_db"])
         do {
             try await Backend(fixture: try SnapshotTests().fixture()).removeVolume("old_db")
-            XCTFail("Sample mode removed a volume")
+            Issue.record("Sample mode removed a volume")
         } catch {}
     }
 }

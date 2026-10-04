@@ -1,100 +1,98 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ColimaCore
 
-final class InspectionTests: XCTestCase {
-    func testDetailsKeepDatabaseProtocolAndSeparateNamedAndBindMounts() throws {
+struct InspectionTests {
+    @Test func detailsKeepDatabaseProtocolAndSeparateNamedAndBindMounts() throws {
         let rows = try ContainerDetails.decode(InspectionRuntime.inspections)
-        let database = try XCTUnwrap(rows.first { $0.id == "database" })
-        XCTAssertEqual(database.state.health, "healthy")
-        XCTAssertEqual(database.ports.first?.address, "127.0.0.1:5432")
-        XCTAssertEqual(database.ports.first?.protocolName, "tcp")
-        XCTAssertEqual(database.mounts.first?.name, "demo_db")
-        XCTAssertEqual(database.mounts.first?.type, "volume")
-        let worker = try XCTUnwrap(rows.first { $0.id == "worker" })
-        XCTAssertEqual(worker.state.oomKilled, true)
-        XCTAssertEqual(worker.state.exitCode, 137)
-        XCTAssertNil(worker.state.health)
-        XCTAssertNil(worker.project)
-        XCTAssertTrue(worker.mounts[0].readOnly)
-        XCTAssertEqual(rows.first { $0.id == "web" }?.mounts.first?.type, "bind")
+        let database = try #require(rows.first { $0.id == "database" })
+        #expect(database.state.health == "healthy")
+        #expect(database.ports.first?.address == "127.0.0.1:5432")
+        #expect(database.ports.first?.protocolName == "tcp")
+        #expect(database.mounts.first?.name == "demo_db")
+        #expect(database.mounts.first?.type == "volume")
+        let worker = try #require(rows.first { $0.id == "worker" })
+        #expect(worker.state.oomKilled == true)
+        #expect(worker.state.exitCode == 137)
+        #expect(worker.state.health == nil)
+        #expect(worker.project == nil)
+        #expect(worker.mounts[0].readOnly)
+        #expect(rows.first { $0.id == "web" }?.mounts.first?.type == "bind")
     }
 
-    func testMissingHealthAndMountMetadataRemainUnavailable() throws {
-        let row = try XCTUnwrap(
+    @Test func missingHealthAndMountMetadataRemainUnavailable() throws {
+        let row = try #require(
             ContainerDetails.decode(
                 #"{"Id":"missing","Name":"/missing","Image":"sha256:unknown","Config":{"Image":"alpine","Labels":null},"State":{"Status":"created"}}"#
             ).first)
-        XCTAssertNil(row.state.oomKilled)
-        XCTAssertNil(row.state.running)
-        XCTAssertNil(row.state.health)
-        XCTAssertEqual(row.mountsAvailable, false)
-        XCTAssertThrowsError(try ContainerDetails.decode("unsupported inspection"))
+        #expect(row.state.oomKilled == nil)
+        #expect(row.state.running == nil)
+        #expect(row.state.health == nil)
+        #expect(row.mountsAvailable == false)
+        #expect(throws: (any Error).self) { try ContainerDetails.decode("unsupported inspection") }
     }
 
-    func testImagesLinkContainersWithFullAndUnambiguousShortIDs() throws {
+    @Test func imagesLinkContainersWithFullAndUnambiguousShortIDs() throws {
         let details = try ContainerDetails.decode(InspectionRuntime.inspections)
         let fullID = "sha256:" + String(repeating: "a", count: 64)
-        XCTAssertEqual(
+        #expect(
             DockerImage.referencingContainers(
-                imageID: fullID, containers: details, knownImageIDs: [fullID]),
-            ["database", "worker"])
-        XCTAssertEqual(
+                imageID: fullID, containers: details, knownImageIDs: [fullID]) == ["database", "worker"])
+        #expect(
             DockerImage.referencingContainers(
-                imageID: String(repeating: "a", count: 12), containers: details, knownImageIDs: [fullID]),
-            ["database", "worker"])
+                imageID: String(repeating: "a", count: 12), containers: details, knownImageIDs: [fullID]) == ["database", "worker"])
         let collision =
             "sha256:" + String(repeating: "a", count: 12) + String(repeating: "b", count: 52)
-        XCTAssertNil(
+        #expect(
             DockerImage.referencingContainers(
                 imageID: String(repeating: "a", count: 12), containers: details,
-                knownImageIDs: [fullID, collision]))
+                knownImageIDs: [fullID, collision]) == nil)
     }
 
-    func testSampleReadsDoNotRequireExecutables() async throws {
+    @Test func sampleReadsDoNotRequireExecutables() async throws {
         let fixture = try SnapshotTests().fixture()
         let backend = Backend(
             fixture: fixture,
             toolchain: Toolchain(environment: [
                 "COLIMA_MINI_DOCKER": "/nonexistent/docker", "COLIMA_MINI_COLIMA": "/nonexistent/colima",
             ]))
-        let id = try XCTUnwrap(fixture.details?.keys.first)
+        let id = try #require(fixture.details?.keys.first)
         let details = try await backend.details(id)
-        XCTAssertEqual(details.id, id)
+        #expect(details.id == id)
         let volumes = try await backend.volumes()
         let images = try await backend.images()
         let storage = try await backend.storage()
-        XCTAssertEqual(volumes.count, 3)
-        XCTAssertEqual(images.count, 3)
-        XCTAssertNotNil(storage.filesystem)
+        #expect(volumes.count == 3)
+        #expect(images.count == 3)
+        #expect(storage.filesystem != nil)
         do {
             _ = try await backend.details("removed")
-            XCTFail("Removed sample has stale details")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("sample")) }
+            Issue.record("Removed sample has stale details")
+        } catch { #expect(error.localizedDescription.contains("sample")) }
     }
 
-    func testBackendReferencesIncludeStoppedContainersAndUnknownMeasurements() async throws {
+    @Test func backendReferencesIncludeStoppedContainersAndUnknownMeasurements() async throws {
         try await InspectionRuntime.run { backend in
             let volumes = try await backend.volumes()
-            let database = try XCTUnwrap(volumes.first { $0.name == "demo_db" })
-            XCTAssertEqual(database.references.map(\.containerID), ["database", "worker"])
-            XCTAssertEqual(database.references.first { $0.containerID == "worker" }?.running, false)
-            XCTAssertEqual(database.attached, true)
-            XCTAssertEqual(database.sizeBytes, 1_976_000_000)
-            let plugin = try XCTUnwrap(volumes.first { $0.name == "plugin_data" })
-            XCTAssertNil(plugin.sizeBytes)
-            XCTAssertEqual(plugin.attached, false)
+            let database = try #require(volumes.first { $0.name == "demo_db" })
+            #expect(database.references.map(\.containerID) == ["database", "worker"])
+            #expect(database.references.first { $0.containerID == "worker" }?.running == false)
+            #expect(database.attached == true)
+            #expect(database.sizeBytes == 1_976_000_000)
+            let plugin = try #require(volumes.first { $0.name == "plugin_data" })
+            #expect(plugin.sizeBytes == nil)
+            #expect(plugin.attached == false)
             let details = try await backend.details("worker")
-            XCTAssertEqual(details.state.oomKilled, true)
+            #expect(details.state.oomKilled == true)
             let images = try await backend.images()
-            XCTAssertEqual(images.first?.containerIDs, ["database", "worker"])
-            XCTAssertEqual(images.first?.sharedBytes, 100_000_000)
-            XCTAssertEqual(images.first?.uniqueBytes, 1_876_000_000)
+            #expect(images.first?.containerIDs == ["database", "worker"])
+            #expect(images.first?.sharedBytes == 100_000_000)
+            #expect(images.first?.uniqueBytes == 1_876_000_000)
         }
     }
 
-    func testAnonymousVolumesAreIdentifiedByDockerLabel() async throws {
+    @Test func anonymousVolumesAreIdentifiedByDockerLabel() async throws {
         let anonymous = String(repeating: "c", count: 64)
         try await InspectionRuntime.run(overrides: [
             "volumeList":
@@ -103,18 +101,18 @@ final class InspectionTests: XCTestCase {
                 "{\"Name\":\"demo_db\",\"Driver\":\"local\",\"Labels\":{\"com.docker.compose.project\":\"demo\"}}\n{\"Name\":\"\(anonymous)\",\"Driver\":\"local\",\"Labels\":{\"com.docker.volume.anonymous\":\"\"}}",
         ]) { backend in
             let volumes = try await backend.volumes()
-            XCTAssertEqual(volumes.first { $0.name == anonymous }?.anonymous, true)
-            XCTAssertEqual(volumes.first { $0.name == "demo_db" }?.anonymous, false)
-            XCTAssertEqual(volumes.first { $0.name == "demo_db" }?.project, "demo")
+            #expect(volumes.first { $0.name == anonymous }?.anonymous == true)
+            #expect(volumes.first { $0.name == "demo_db" }?.anonymous == false)
+            #expect(volumes.first { $0.name == "demo_db" }?.project == "demo")
         }
     }
 
-    func testFailedReferenceReadNeverReportsVolumesAsUnattached() async throws {
+    @Test func failedReferenceReadNeverReportsVolumesAsUnattached() async throws {
         try await InspectionRuntime.run(overrides: ["inspectError": true]) { backend in
             let volumes = try await backend.volumes()
-            XCTAssertTrue(volumes.allSatisfy { !$0.referencesAvailable && $0.attached == nil })
-            XCTAssertTrue(volumes.allSatisfy { $0.dataIssue?.contains("reference") == true })
-            XCTAssertEqual(volumes.first { $0.name == "demo_db" }?.sizeBytes, 1_976_000_000)
+            #expect(volumes.allSatisfy { !$0.referencesAvailable && $0.attached == nil })
+            #expect(volumes.allSatisfy { $0.dataIssue?.contains("reference") == true })
+            #expect(volumes.first { $0.name == "demo_db" }?.sizeBytes == 1_976_000_000)
         }
     }
 }
