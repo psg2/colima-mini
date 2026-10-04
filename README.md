@@ -18,7 +18,7 @@ Colima Mini is an independent, unofficial project under the MIT license.
 1. Install the runtime with [Homebrew](https://brew.sh) and start the default profile:
 
    ```sh
-   brew install colima docker python
+   brew install colima docker
    colima start
    ```
 

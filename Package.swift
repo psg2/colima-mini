@@ -8,7 +8,6 @@ let package = Package(
     targets: [
         .target(
             name: "ColimaCore",
-            resources: [.copy("Resources/docker-sweep.py")],
             swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]
         ),
         .target(

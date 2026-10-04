@@ -5,7 +5,6 @@ package struct Fixture: Decodable {
     package let containers: String
     package let stats: String
     package let logs: [String: String]?
-    package let sweep: String?
     package var sweepGroups: [SweepGroup]? = nil
     package var environment: [String: [String]]? = nil
     package var networks: [DockerNetwork]? = nil

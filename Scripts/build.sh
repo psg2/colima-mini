@@ -26,9 +26,6 @@ for architecture in "${ARCHITECTURES[@]}"; do
   swift build --package-path "$ROOT" --scratch-path "$SCRATCH" -c release --product ColimaMini --triple "$TRIPLE" >&2
   BIN_DIR="$(swift build --package-path "$ROOT" --scratch-path "$SCRATCH" -c release --triple "$TRIPLE" --show-bin-path)"
   BINARIES+=("$BIN_DIR/ColimaMini")
-  if [[ ! -d "$APP/Contents/Resources/ColimaMini_ColimaCore.bundle" ]]; then
-    ditto "$BIN_DIR/ColimaMini_ColimaCore.bundle" "$APP/Contents/Resources/ColimaMini_ColimaCore.bundle"
-  fi
 done
 if $UNIVERSAL; then
   lipo -create "${BINARIES[@]}" -output "$APP/Contents/MacOS/ColimaMini"
