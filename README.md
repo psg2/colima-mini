@@ -28,9 +28,6 @@ Colima Mini is an independent, unofficial project under the MIT license.
 It needs macOS 14 or later and runs on Apple Silicon and Intel. The app doesn't
 bundle a Docker engine; it drives the Colima and Docker CLIs you installed.
 
-The latest release (v0.4.0) predates most of what this page describes. Until the
-next one, [build from source](#build-from-source) to get it.
-
 ### Open a downloaded release for the first time
 
 Releases are ad-hoc signed, not notarized, so macOS asks before the first launch.
