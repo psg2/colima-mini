@@ -53,21 +53,22 @@ final class CleanupTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: Self.accounting).write(to: state)
         let record = directory.appendingPathComponent("commands")
         let program = #"""
-            #!/usr/bin/env python3
-            import os, pathlib, sys
-            a = sys.argv[1:]
-            if a[:2] != ['--context', 'colima']: sys.exit('foreign Docker runtime')
-            a = a[2:]
-            if a[:2] == ['system', 'df']: print(pathlib.Path(os.environ['CLEANUP_DF']).read_text())
-            elif a[:2] == ['network', 'ls']:
-                print('{"ID":"net1","Name":"old_default","Driver":"bridge"}')
-            else:
-                with open(os.environ['CLEANUP_RECORD'], 'a') as f: f.write(' '.join(a) + '\n')
-                if a == ['volume', 'rm', 'anon2']: sys.exit('Error: volume is in use')
-                if a[:2] == ['builder', 'prune']: print('ID\tRECLAIMABLE\tSIZE\ncache1\ttrue\t90MB\nTotal:\t94.37MB')
+            #!/bin/sh
+            [ "$1 $2" = "--context colima" ] || { echo 'foreign Docker runtime' >&2; exit 1; }
+            shift 2
+            case "$1 $2" in
+              "system df") cat "$CLEANUP_DF"; echo ;;
+              "network ls") echo '{"ID":"net1","Name":"old_default","Driver":"bridge"}' ;;
+              *)
+                echo "$*" >>"$CLEANUP_RECORD"
+                if [ "$*" = "volume rm anon2" ]; then echo 'Error: volume is in use' >&2; exit 1; fi
+                if [ "$1 $2" = "builder prune" ]; then
+                  printf 'ID\tRECLAIMABLE\tSIZE\ncache1\ttrue\t90MB\nTotal:\t94.37MB\n'
+                fi ;;
+            esac
             """#
         let docker = directory.appendingPathComponent("docker")
-        try Data(program.utf8).write(to: docker)
+        try Data((program + "\n").utf8).write(to: docker)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: docker.path)
         var env = ProcessInfo.processInfo.environment
         env["COLIMA_MINI_DOCKER"] = docker.path

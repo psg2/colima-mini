@@ -149,47 +149,70 @@ enum InspectionRuntime {
                 "Filesystem 1B-blocks Used Available Use% Mounted on\n/dev/vdb1 100000000000 20000000000 75000000000 20% /var/lib/docker\n",
         ]
         state.merge(overrides, uniquingKeysWith: { _, new in new })
-        let stateURL = directory.appendingPathComponent("state.json")
-        try JSONSerialization.data(withJSONObject: state).write(to: stateURL)
+        // One file per state key; a `true` switch is an empty file.
+        let stateDirectory = directory.appendingPathComponent("state")
+        try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+        for (key, value) in state {
+            if let text = value as? String {
+                try Data((text + "\n").utf8).write(to: stateDirectory.appendingPathComponent(key))
+            } else if value as? Bool == true {
+                try Data().write(to: stateDirectory.appendingPathComponent(key))
+            }
+        }
         let program = #"""
-            #!/usr/bin/env python3
-            import json, os, pathlib, sys
-            d = json.loads(pathlib.Path(os.environ['COLIMA_INSPECTION_STATE']).read_text())
-            a = sys.argv[1:]
-            if pathlib.Path(sys.argv[0]).name == 'colima':
-                if a[0] == 'list': print(d['vm'])
-                elif a[0] == 'ssh':
-                    if d.get('filesystemError') or a[-1] != d['dataRoot']: sys.exit('data filesystem unavailable')
-                    print(d['filesystem'])
-                else: sys.exit('unsupported Colima read')
-            else:
-                if a[:2] != ['--context', 'colima'] or 'DOCKER_HOST' in os.environ:
-                    sys.exit('foreign Docker runtime')
-                a = a[2:]
-                if a[0] == 'info': print(d['dataRoot'])
-                elif a[0] == 'ps':
-                    print('\n'.join(json.loads(l)['Id'] for l in d['inspections'].splitlines()))
-                elif a[0] == 'inspect':
-                    if d.get('inspectError'): sys.exit('container references unavailable')
-                    for line in d['inspections'].splitlines():
-                        if json.loads(line)['Id'] in a: print(line)
-                elif a[:2] == ['volume', 'ls']: print(d['volumeList'])
-                elif a[:2] == ['volume', 'inspect']: print(d['volumeMetadata'])
-                elif a[:2] == ['system', 'df']:
-                    if d.get('dockerError'): sys.exit('daemon accounting unavailable')
-                    print(d['verbose'] if '--verbose' in a else d['summary'])
-                else: sys.exit('unsupported Docker read')
+            #!/bin/sh
+            d="$COLIMA_INSPECTION_STATE"
+            fail() { echo "$1" >&2; exit 1; }
+            if [ "$(basename "$0")" = colima ]; then
+              case "$1" in
+                list) cat "$d/vm" ;;
+                ssh)
+                  eval "last=\${$#}"
+                  if [ -f "$d/filesystemError" ] || [ "$last" != "$(cat "$d/dataRoot")" ]; then
+                    fail 'data filesystem unavailable'
+                  fi
+                  cat "$d/filesystem" ;;
+                *) fail 'unsupported Colima read' ;;
+              esac
+              exit 0
+            fi
+            if [ "$1 $2" != "--context colima" ] || [ -n "${DOCKER_HOST+set}" ]; then fail 'foreign Docker runtime'; fi
+            shift 2
+            # Each inspection line starts with {"Id":"<id>".
+            id_of() { sed -n 's/^{"Id":"\([^"]*\)".*/\1/p'; }
+            case "$1 $2" in
+              info*) cat "$d/dataRoot" ;;
+              ps*) id_of <"$d/inspections" ;;
+              inspect*)
+                [ ! -f "$d/inspectError" ] || fail 'container references unavailable'
+                shift
+                while IFS= read -r line; do
+                  id=$(printf '%s\n' "$line" | id_of)
+                  for wanted in "$@"; do
+                    if [ "$wanted" = "$id" ]; then printf '%s\n' "$line"; break; fi
+                  done
+                done <"$d/inspections" ;;
+              "volume ls") cat "$d/volumeList" ;;
+              "volume inspect") cat "$d/volumeMetadata" ;;
+              "system df")
+                [ ! -f "$d/dockerError" ] || fail 'daemon accounting unavailable'
+                case " $* " in
+                  *" --verbose "*) cat "$d/verbose" ;;
+                  *) cat "$d/summary" ;;
+                esac ;;
+              *) fail 'unsupported Docker read' ;;
+            esac
             """#
         for name in ["docker", "colima"] {
             let url = directory.appendingPathComponent(name)
-            try Data(program.utf8).write(to: url)
+            try Data((program + "\n").utf8).write(to: url)
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
         }
         var env = ProcessInfo.processInfo.environment
         env["COLIMA_MINI_DOCKER"] = directory.appendingPathComponent("docker").path
         env["COLIMA_MINI_COLIMA"] = directory.appendingPathComponent("colima").path
         env["COLIMA_HOME"] = directory.appendingPathComponent("unsupported-home").path
-        env["COLIMA_INSPECTION_STATE"] = stateURL.path
+        env["COLIMA_INSPECTION_STATE"] = stateDirectory.path
         env["DOCKER_HOST"] = "unix:///foreign.sock"
         try await body(Backend(toolchain: Toolchain(environment: env)))
     }

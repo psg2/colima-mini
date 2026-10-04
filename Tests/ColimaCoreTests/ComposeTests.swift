@@ -25,19 +25,18 @@ final class ComposeTests: XCTestCase {
         let labelsURL = directory.appendingPathComponent("labels.json")
         try JSONSerialization.data(withJSONObject: labels).write(to: labelsURL)
         let record = directory.appendingPathComponent("commands")
+        // Records each command as a JSON array of its arguments.
         let program = #"""
-            #!/usr/bin/env python3
-            import json, os, sys
-            a = sys.argv[1:]
-            if a[:2] != ['--context', 'colima']: sys.exit('foreign Docker runtime')
-            a = a[2:]
-            if a[0] == 'inspect':
-                print(open(os.environ['COMPOSE_LABELS']).read())
-            else:
-                with open(os.environ['COMPOSE_RECORD'], 'a') as f: f.write(json.dumps(a) + '\n')
+            #!/bin/sh
+            [ "$1 $2" = "--context colima" ] || { echo 'foreign Docker runtime' >&2; exit 1; }
+            shift 2
+            if [ "$1" = inspect ]; then cat "$COMPOSE_LABELS"; echo; exit 0; fi
+            arguments=''
+            for argument in "$@"; do arguments="$arguments${arguments:+, }\"$argument\""; done
+            echo "[$arguments]" >>"$COMPOSE_RECORD"
             """#
         let docker = directory.appendingPathComponent("docker")
-        try Data(program.utf8).write(to: docker)
+        try Data((program + "\n").utf8).write(to: docker)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: docker.path)
         var env = ProcessInfo.processInfo.environment
         env["COLIMA_MINI_DOCKER"] = docker.path
