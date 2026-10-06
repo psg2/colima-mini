@@ -43,7 +43,10 @@ package struct PendingAction: Identifiable {
     private var actedOn: [String: Date] = [:]
     package var onAlerts: (([ContainerAlert]) -> Void)?
     @Published package var route = AppRoute.containers
-    @Published package var snapshot: Snapshot?
+    @Published package var snapshot: Snapshot? {
+        // Checked once per snapshot, not on every render: each check reads the disk.
+        didSet { orphanedProjects = findOrphanedProjects() }
+    }
     @Published package var error: String?
     @Published package var refreshing = false
     @Published package var busy = false
@@ -52,7 +55,9 @@ package struct PendingAction: Identifiable {
     @Published package var containerTab = ContainerPageTab.overview
     @Published package var project = "All containers"
     @Published package var search = ""
-    @Published package var listScrollID: String?
+    // Not published: the list writes it on every scroll step, and publishing
+    // would re-render every view that observes the dashboard.
+    package var listScrollID: String?
     @Published package var volumeSearch = ""
     @Published package var imageSearch = ""
     @Published package var unattachedOnly = false
@@ -216,7 +221,8 @@ package struct PendingAction: Identifiable {
     package var attention: [Container] { containers.filter(\.needsAttention) }
     // Compose projects whose folder or worktree no longer exists: the clearest
     // sign of a stack nobody will come back to.
-    package var orphanedProjects: [String] {
+    package private(set) var orphanedProjects: [String] = []
+    private func findOrphanedProjects() -> [String] {
         guard !sample else { return [] }
         return (snapshot?.projects ?? []).filter { origin(of: $0).map { !$0.exists() } ?? false }
     }

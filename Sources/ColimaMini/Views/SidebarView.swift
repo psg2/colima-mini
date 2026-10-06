@@ -58,6 +58,7 @@ struct SidebarView: View {
                     "Networks", symbol: "point.3.connected.trianglepath.dotted", route: .networks)
                 navigationRow("Storage", symbol: "chart.pie", route: .storage)
                 Section("Projects") {
+                    let orphaned = model.orphanedProjects
                     ForEach(model.snapshot?.projects ?? [], id: \.self) { project in
                         let origin = model.origin(of: project)
                         HStack {
@@ -65,7 +66,7 @@ struct SidebarView: View {
                                 project,
                                 systemImage: project == "Standalone"
                                     ? "shippingbox"
-                                    : model.orphanedProjects.contains(project)
+                                    : orphaned.contains(project)
                                         ? "folder.badge.questionmark" : origin?.kind.symbol ?? "folder"
                             )
                             .lineLimit(1).truncationMode(.middle)

@@ -44,14 +44,15 @@ package struct Container: Decodable, Identifiable {
         status.replacingOccurrences(
             of: #"\s*\((?:healthy|unhealthy|health: starting)\)$"#, with: "", options: .regularExpression)
     }
+    // Compiled once: rows read ports on every render.
+    private static let publishedPortPattern = try! NSRegularExpression(
+        pattern: #"(?:^|,\s*)(127\.0\.0\.1|0\.0\.0\.0|\[::\]|\[::1\]):(\d+)->(\d+)/(tcp|udp)"#)
     // Ports Docker publishes on the Mac's loopback or wildcard addresses. IPv4 and
     // IPv6 bindings of one host port collapse into a single entry.
     package var publishedPorts: [PublishedPort] {
-        let regex = try! NSRegularExpression(
-            pattern: #"(?:^|,\s*)(127\.0\.0\.1|0\.0\.0\.0|\[::\]|\[::1\]):(\d+)->(\d+)/(tcp|udp)"#)
         let text = ports as NSString
         var seen = Set<String>()
-        return regex.matches(in: ports, range: NSRange(location: 0, length: text.length)).compactMap {
+        return Self.publishedPortPattern.matches(in: ports, range: NSRange(location: 0, length: text.length)).compactMap {
             match in
             guard let host = Int(text.substring(with: match.range(at: 2))),
                 let target = Int(text.substring(with: match.range(at: 3)))
@@ -63,17 +64,7 @@ package struct Container: Decodable, Identifiable {
         }
     }
     package var endpoints: [URL] {
-        let regex = try! NSRegularExpression(
-            pattern: #"(?:^|,\s*)(?:127\.0\.0\.1|0\.0\.0\.0|\[::\]|\[::1\]):(\d+)->(\d+)/tcp"#)
-        let text = ports as NSString
-        var seen = Set<String>()
-        return regex.matches(in: ports, range: NSRange(location: 0, length: text.length)).compactMap {
-            match in
-            let port = text.substring(with: match.range(at: 1))
-            guard seen.insert(port).inserted else { return nil }
-            let scheme = text.substring(with: match.range(at: 2)) == "443" ? "https" : "http"
-            return URL(string: "\(scheme)://localhost:\(port)")
-        }
+        publishedPorts.compactMap { $0.url(scheme: $0.containerPort == 443 ? "https" : "http") }
     }
 }
 

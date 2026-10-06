@@ -31,7 +31,7 @@ struct ProjectSection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(project).font(.headline).lineLimit(1).truncationMode(.middle)
-                        if let origin, !origin.exists() {
+                        if let origin, model.orphanedProjects.contains(project) {
                             Text("Folder missing").font(.caption2.weight(.medium)).foregroundStyle(.orange)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                 .background(Color.orange.opacity(0.13), in: Capsule())
