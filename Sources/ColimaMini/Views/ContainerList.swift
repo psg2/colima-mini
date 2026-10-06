@@ -28,16 +28,15 @@ struct ContainerList: View {
                                 .foregroundStyle(.secondary)
                         }.frame(maxWidth: .infinity).padding(36)
                     } else if model.grouped {
-                        ForEach(Array(Set(model.visible.map(\.project))).sorted(), id: \.self) { project in
-                            ProjectSection(
-                                model: model, project: project,
-                                containers: model.visible.filter { $0.project == project })
+                        let groups = Dictionary(grouping: model.visible, by: \.project)
+                        ForEach(groups.keys.sorted(), id: \.self) { project in
+                            ProjectSection(model: model, project: project, containers: groups[project] ?? [])
                         }
                     } else {
                         ForEach(model.visible) { ContainerRow(model: model, container: $0, showProject: true) }
                     }
                 }.scrollTargetLayout().padding(.horizontal, 12).padding(.bottom, 12)
-            }.scrollPosition(id: $model.listScrollID)
+            }.scrollPosition(id: Binding(get: { model.listScrollID }, set: { model.listScrollID = $0 }))
         }
     }
 }

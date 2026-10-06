@@ -78,6 +78,13 @@ struct ContainerStateTests {
             state: "running", status: "Up 1 minute", ports: "0.0.0.0:5353->53/udp")
         #expect(dns.publishedPorts.first?.url(scheme: "http") == nil)
     }
+    @Test func endpointsUseHTTPSForContainerPort443AndSkipUDP() throws {
+        let proxy = try container(
+            state: "running", status: "Up 2 hours",
+            ports: "0.0.0.0:8443->443/tcp, [::]:8443->443/tcp, 0.0.0.0:8080->80/tcp, 0.0.0.0:5353->53/udp")
+        #expect(
+            proxy.endpoints.map(\.absoluteString) == ["https://localhost:8443", "http://localhost:8080"])
+    }
 
     @Test func conditionSeparatesHealthFromExitCodes() throws {
         let cases: [(String, String, ContainerCondition, Bool)] = [
