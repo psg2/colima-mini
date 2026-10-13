@@ -53,7 +53,7 @@ one app and leaves Gatekeeper on.
   environment variables with secrets masked. **Shell** and **Open** use the
   terminal and editor you pick from their menus.
 - **Unused containers.** **Review unused containers** finds stacks whose folder
-  was deleted, stopped for over a day, or idle, and offers to stop or remove them.
+  was deleted, stopped for over a day, or idle, and cleans up the ones you pick in one step.
 - **Images, volumes and networks.** Sizes, which containers use each one, and
   removal of the unused ones, singly or in bulk. Docker refuses anything still in use.
 - **Disk.** Storage shows the VM disk, Docker's usage and the space taken on your

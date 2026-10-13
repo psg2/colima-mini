@@ -81,6 +81,11 @@ package struct PendingAction: Identifiable {
     @Published package var sweptAt: Date?
     @Published package var scanning = false
     @Published package var showingSweep = false
+    // Groups the next cleanup acts on. A scan selects every suggested group.
+    @Published package var sweepSelection: Set<String> = []
+    // Whether cleanup also removes the containers it only stops by default.
+    @Published package var removeStopped = false
+    @Published package var sweepProgress: SweepProgress?
     @Published package var pending: PendingAction?
     @Published package var onlyRunning = false
     @Published package var grouped = true
@@ -687,7 +692,9 @@ package struct PendingAction: Identifiable {
         defer { scanning = false }
         sweepError = nil
         do {
-            sweepGroups = try await backend.unusedContainers()
+            let groups = try await backend.unusedContainers()
+            sweepGroups = groups
+            sweepSelection = Set(groups.filter(\.verdict.suggested).map(\.id))
             sweptAt = Date()
         } catch {
             sweepError = "Scan failed: " + error.localizedDescription
@@ -700,6 +707,74 @@ package struct PendingAction: Identifiable {
             group.containerIDs.contains { $0.hasPrefix(container.id) || container.id.hasPrefix($0) }
         }
     }
+    package func sweepAction(for group: SweepGroup) -> SweepAction {
+        let action = group.verdict.cleanup
+        return action == .stop && removeStopped ? .stopAndRemove : action
+    }
+    // What cleaning up the selected groups would do to their containers now.
+    // A group whose action is only removal skips a container that started
+    // since the scan, and Docker refuses to remove one that is still running.
+    package var sweepPlan: SweepPlan {
+        var stop: [Container] = []
+        var remove: [Container] = []
+        for group in sweepGroups ?? [] where sweepSelection.contains(group.id) {
+            let action = sweepAction(for: group)
+            for container in members(of: group) {
+                if container.running, action != .remove { stop.append(container) }
+                if action.removes, !container.running || action == .stopAndRemove { remove.append(container) }
+            }
+        }
+        return SweepPlan(stop: stop, remove: remove, memory: snapshot?.totalMemory(stop) ?? 0)
+    }
+    // Stops in small batches, then removes one container at a time without
+    // force. A failure is reported and the rest still go; volumes are kept.
+    package func cleanUp() async {
+        let plan = sweepPlan
+        guard !busy, !sample, !scanning, !plan.isEmpty else { return }
+        invalidateRefresh()
+        busy = true
+        sweepError = nil
+        let now = Date()
+        for container in plan.stop + plan.remove { actedOn[container.id] = now }
+        let total = plan.stop.count + plan.remove.count
+        var done = 0
+        var failures: [String] = []
+        for start in stride(from: 0, to: plan.stop.count, by: 8) {
+            let batch = Array(plan.stop[start..<min(start + 8, plan.stop.count)])
+            sweepProgress = SweepProgress(done: done, total: total, activity: "Stopping \(plan.stop.count) containers…")
+            do { _ = try await backend.docker(["stop"] + batch.map(\.id), timeout: 120) } catch {
+                failures.append(error.localizedDescription)
+            }
+            done += batch.count
+        }
+        for container in plan.remove {
+            sweepProgress = SweepProgress(done: done, total: total, activity: "Removing \(container.name)…")
+            do { _ = try await backend.docker(["rm", container.id], timeout: 60) } catch {
+                failures.append(container.name + ": " + error.localizedDescription)
+            }
+            done += 1
+        }
+        sweepProgress = nil
+        busy = false
+        await refresh()
+        if !failures.isEmpty { sweepError = "Some containers were not cleaned up. " + failures.joined(separator: "; ") }
+    }
+}
+
+package struct SweepPlan {
+    package let stop: [Container]
+    package let remove: [Container]
+    // Memory the containers being stopped use now.
+    package let memory: Double
+    package var isEmpty: Bool { stop.isEmpty && remove.isEmpty }
+    // Each container counts once, even when it is stopped and then removed.
+    package var count: Int { Set((stop + remove).map(\.id)).count }
+}
+
+package struct SweepProgress {
+    package let done: Int
+    package let total: Int
+    package let activity: String
 }
 
 // A page's own cleanup opens Reclaim limited to that page's object types.
