@@ -29,6 +29,28 @@ package enum SweepVerdict: String, Decodable, CaseIterable {
     }
     // Groups the scanner suggests acting on; the others are listed as kept.
     package var suggested: Bool { [.orphan, .stale, .idle].contains(self) }
+    // What cleaning up a group with this verdict does by default. A deleted
+    // folder can never run again, so its containers go; running ones are only
+    // stopped unless the user also asks to remove them.
+    package var cleanup: SweepAction {
+        switch self {
+        case .orphan: return .stopAndRemove
+        case .stale, .stopped: return .remove
+        case .idle, .recent, .active: return .stop
+        }
+    }
+}
+
+package enum SweepAction: String, CaseIterable {
+    case stop, remove, stopAndRemove
+    package var title: String {
+        switch self {
+        case .stop: return "Stop"
+        case .remove: return "Remove"
+        case .stopAndRemove: return "Stop and remove"
+        }
+    }
+    package var removes: Bool { self != .stop }
 }
 
 package struct SweepGroup: Decodable, Identifiable, Equatable {

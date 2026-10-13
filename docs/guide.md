@@ -73,8 +73,15 @@ Removing a container keeps its volumes. Only stopped containers can be removed.
 
 **Review unused containers** in the Containers header scans every container and
 groups them by project with a verdict: project folder deleted, stopped for over a
-day, running but idle, quiet but logged recently, or in use. Each group offers
-**Stop** or **Remove…**. The scan itself changes nothing.
+day, running but idle, quiet but logged recently, or in use. The scan itself
+changes nothing.
+
+The suggested groups start selected; uncheck any you want to keep, or check a
+kept group. **Clean up** asks once, then stops and removes the containers of
+deleted folders, removes containers stopped for over a day and stops idle ones.
+Check **Also remove what it stops** to remove idle containers too. The footer
+shows how much memory the selection frees. Removal never forces and keeps
+volumes.
 
 Projects whose folder was deleted show a folder badge on that button and in the
 sidebar, and the menu bar lists them.

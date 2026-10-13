@@ -317,6 +317,61 @@ private actor ResultGate<Value> {
         #expect(!(error.contains("first") || error.contains("last")), "\(error)")
         #expect(!model.busy)
     }
+    @Test func cleanupActsOnlyOnSelectedGroupsAndNeverForces() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let docker = directory.appendingPathComponent("docker")
+        let log = directory.appendingPathComponent("changes")
+        try Data(
+            """
+            #!/bin/sh
+            shift 2
+            echo "$*" >>"\(log.path)"
+            """.utf8
+        ).write(to: docker)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: docker.path)
+        let vm = #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#
+        let state = try Snapshot.decode(
+            vm: vm,
+            containers: """
+                {"ID":"orphan1","Names":"gone-db-1","Image":"postgres","State":"running","Status":"Up","Ports":"","Labels":"com.docker.compose.project=gone"}
+                {"ID":"orphan2","Names":"gone-web-1","Image":"web","State":"exited","Status":"Exited (0)","Ports":"","Labels":"com.docker.compose.project=gone"}
+                {"ID":"stale1","Names":"old","Image":"web","State":"exited","Status":"Exited (0)","Ports":"","Labels":""}
+                {"ID":"idle1","Names":"quiet","Image":"postgres","State":"running","Status":"Up","Ports":"","Labels":""}
+                {"ID":"idle2","Names":"unpicked","Image":"postgres","State":"running","Status":"Up","Ports":"","Labels":""}
+                """, stats: "")
+        let model = Dashboard(
+            backend: Backend(
+                toolchain: Toolchain(environment: [
+                    "COLIMA_MINI_DOCKER": docker.path, "COLIMA_MINI_COLIMA": "/usr/bin/true",
+                ])),
+            readSnapshot: { state })
+        model.snapshot = state
+        model.sweepGroups = [
+            SweepGroup(verdict: .orphan, name: "gone", project: "gone", reason: "", containerIDs: ["orphan1", "orphan2"]),
+            SweepGroup(verdict: .stale, name: "old", project: nil, reason: "", containerIDs: ["stale1"]),
+            SweepGroup(verdict: .idle, name: "quiet", project: nil, reason: "", containerIDs: ["idle1"]),
+            SweepGroup(verdict: .idle, name: "unpicked", project: nil, reason: "", containerIDs: ["idle2"]),
+        ]
+        model.sweepSelection = ["gone", "old", "quiet"]
+
+        await model.cleanUp()
+        let first = try String(contentsOf: log, encoding: .utf8).split(separator: "\n").map(String.init)
+        let stopped = Set(first.filter { $0.hasPrefix("stop ") }.flatMap { $0.split(separator: " ").dropFirst() }.map(String.init))
+        let removed = Set(first.filter { $0.hasPrefix("rm ") }.map { String($0.dropFirst(3)) })
+        #expect(stopped == ["orphan1", "idle1"])
+        #expect(removed == ["orphan1", "orphan2", "stale1"])
+        #expect(!first.contains { $0.contains("-f") || $0.contains("-v") }, "\(first)")
+
+        try FileManager.default.removeItem(at: log)
+        model.sweepSelection = ["quiet"]
+        model.removeStopped = true
+        await model.cleanUp()
+        let second = try String(contentsOf: log, encoding: .utf8).split(separator: "\n").map(String.init)
+        #expect(second == ["stop idle1", "rm idle1"])
+        #expect(!model.busy && model.sweepProgress == nil)
+    }
     @Test func reopeningTheSameContainerKeepsOneBackStep() async throws {
         let model = Dashboard(backend: backend())
         model.navigate(.volumes)
