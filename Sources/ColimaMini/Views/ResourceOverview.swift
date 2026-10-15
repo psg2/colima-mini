@@ -34,7 +34,7 @@ struct ResourceOverview: View {
 
 // Below a capped "Needs attention" list: how many were left out, and one
 // confirmed removal of every failed container that has stopped. `showAll`
-// opens the container list, which has the full set.
+// opens the container list, which has the full set once Running only is off.
 struct AttentionFooter: View {
     @ObservedObject var model: Dashboard
     let limit: Int
@@ -42,12 +42,18 @@ struct AttentionFooter: View {
     var body: some View {
         let hidden = model.attention.count - limit
         let failed = model.failedStopped
-        if hidden > 0 || failed.count > 1 {
+        if hidden > 0 || !failed.isEmpty {
             HStack(spacing: 10) {
-                if hidden > 0 { Button("Show \(hidden) more", action: showAll).buttonStyle(.link) }
+                if hidden > 0 {
+                    Button("Show \(hidden) more") {
+                        model.onlyRunning = false
+                        showAll()
+                    }.buttonStyle(.link)
+                }
                 Spacer()
-                if failed.count > 1 {
+                if !failed.isEmpty {
                     Button("Remove \(failed.count) stopped…") {
+                        model.onlyRunning = false
                         showAll()
                         model.requestRemoveFailed()
                     }
