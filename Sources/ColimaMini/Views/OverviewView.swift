@@ -107,7 +107,7 @@ struct OverviewView: View {
     private var attention: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Needs attention").font(.headline)
-            ForEach(model.attention) { container in
+            ForEach(model.attention.prefix(8)) { container in
                 HStack(spacing: 10) {
                     ConditionPill(condition: container.condition)
                     Text(container.name).lineLimit(1).truncationMode(.middle)
@@ -118,6 +118,7 @@ struct OverviewView: View {
                         .disabled(model.busy || model.sample)
                 }
             }
+            AttentionFooter(model: model, limit: 8) { model.navigate(.containers, project: "All containers") }
         }.padding(16).background(card)
     }
     private func usage(_ snapshot: Snapshot) -> some View {

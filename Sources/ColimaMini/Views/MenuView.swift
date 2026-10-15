@@ -150,7 +150,8 @@ struct MenuView: View {
         VStack(alignment: .leading, spacing: 6) {
             Label("Needs attention", systemImage: "exclamationmark.triangle.fill")
                 .font(.caption.weight(.semibold)).foregroundStyle(.orange)
-            ForEach(model.attention) { container in
+            let attention = model.attention
+            ForEach(attention.prefix(Self.attentionLimit)) { container in
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(container.service).lineLimit(1)
@@ -165,8 +166,14 @@ struct MenuView: View {
                     }.disabled(model.busy || model.sample)
                 }.controlSize(.small)
             }
+            AttentionFooter(model: model, limit: Self.attentionLimit) {
+                model.navigate(.containers, project: "All containers")
+                showDashboard()
+            }
         }
     }
+    // A long list of failures would push the rest of the menu off screen.
+    private static let attentionLimit = 5
 
     private func projectDetail(_ containers: [Container], _ origin: ProjectOrigin?) -> String {
         var parts: [String] = []

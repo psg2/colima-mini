@@ -154,8 +154,8 @@ struct ContainersView: View {
                 }
                 RefreshButton(busy: model.refreshing || model.busy) { await model.refresh() }
             }.padding(20)
-            if let snapshot = model.snapshot, snapshot.containers.contains(where: \.needsAttention) {
-                ResourceOverview(snapshot: snapshot).padding(.horizontal, 20).padding(.bottom, 12)
+            if !model.attention.isEmpty {
+                ResourceOverview(model: model).padding(.horizontal, 20).padding(.bottom, 12)
             }
             HStack(spacing: 12) {
                 Picker("View", selection: $model.grouped) {

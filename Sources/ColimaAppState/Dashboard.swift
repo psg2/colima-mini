@@ -224,6 +224,11 @@ package struct PendingAction: Identifiable {
         }
     }
     package var attention: [Container] { containers.filter(\.needsAttention) }
+    // Failed containers that are no longer running, which removal accepts
+    // without force.
+    package var failedStopped: [Container] { attention.filter { !$0.running } }
+    package func requestRemoveFailed() { request("rm", containers: failedStopped) }
+    package func checkAttention() { checked.formUnion(attention.map(\.id)) }
     // Compose projects whose folder or worktree no longer exists: the clearest
     // sign of a stack nobody will come back to.
     package private(set) var orphanedProjects: [String] = []
