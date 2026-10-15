@@ -270,6 +270,22 @@ private actor ResultGate<Value> {
         #expect(model.route == .containers)
         #expect(model.project == "demo")
     }
+    @Test func removingFailedContainersOffersOnlyStoppedFailures() throws {
+        let containers = """
+            {"ID":"killed","Names":"sbx-1","Image":"sbx","State":"exited","Status":"Exited (137) 2 hours ago","Ports":"","Labels":""}
+            {"ID":"dead","Names":"sbx-2","Image":"sbx","State":"dead","Status":"Dead","Ports":"","Labels":""}
+            {"ID":"clean","Names":"job-1","Image":"job","State":"exited","Status":"Exited (0) 2 hours ago","Ports":"","Labels":""}
+            {"ID":"sick","Names":"api-1","Image":"api","State":"running","Status":"Up 1 hour (unhealthy)","Ports":"","Labels":""}
+            """
+        let model = Dashboard(backend: backend())
+        model.snapshot = try Snapshot.decode(
+            vm: #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#,
+            containers: containers, stats: "")
+        model.requestRemoveFailed()
+        let action = try #require(model.pending)
+        #expect(Set(action.containers.map(\.id)) == ["killed", "dead"])
+        #expect(action.verb == "rm")
+    }
     @Test func removalOffersOnlyStoppedContainersAndLeavesTheRemovedPage() async throws {
         let running = try snapshot()
         let stopped = try snapshot(running: false)
