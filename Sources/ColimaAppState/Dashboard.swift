@@ -12,8 +12,9 @@ package struct PendingAction: Identifiable {
     package let compose: ComposeAction?
     // The confirmation button's title.
     package var label: String {
-        compose?.title ?? (verb == "rm" ? "Remove" : verb.capitalized)
+        compose?.title ?? ["rm": "Remove", Self.removeAll: "Stop and remove all"][verb] ?? verb.capitalized
     }
+    package static let removeAll = "removeAll"
     package var destructive: Bool { compose?.destructive ?? (verb != "start") }
     package init(
         title: String, message: String, verb: String, containers: [Container], vm: Bool,
@@ -624,6 +625,19 @@ package struct PendingAction: Identifiable {
                         ? "\n\nIts logs and container files are deleted. Volumes are kept." : ""),
             verb: verb, containers: containers, vm: vm)
     }
+    // Clears Docker even of containers in use: the tools that need them create
+    // fresh ones. Only the containers listed here are touched, never with
+    // force, and volumes are kept.
+    package func requestRemoveAll() {
+        guard !sample, !busy, !containers.isEmpty else { return }
+        let running = containers.filter(\.running).count
+        pending = PendingAction(
+            title: "Stop and remove all \(containers.count) container\(containers.count == 1 ? "" : "s")?",
+            message: "\(running) running are stopped first, even ones in use. Logs and container files are "
+                + "deleted; volumes are kept, so tools that need these containers can create them again.\n\n"
+                + containers.map(\.name).sorted().joined(separator: ", "),
+            verb: PendingAction.removeAll, containers: containers, vm: false)
+    }
     // Compose runs against the whole project, including services that have no
     // container yet, so the dialog names the folder rather than containers.
     package func requestCompose(_ action: ComposeAction, project: String) {
@@ -651,6 +665,12 @@ package struct PendingAction: Identifiable {
             if let compose = action.compose, let first = action.containers.first {
                 let project = try await backend.composeProject(first.project, containerID: first.id)
                 try await backend.compose(compose, project: project)
+            } else if action.verb == PendingAction.removeAll {
+                let failures = await stopAndRemove(
+                    stop: action.containers.filter(\.running), remove: action.containers)
+                if !failures.isEmpty {
+                    actionError = "Some containers were not removed. " + failures.joined(separator: "; ")
+                }
             } else if action.vm {
                 _ = try await backend.vm(action.verb)
             } else if !action.containers.isEmpty {
@@ -741,18 +761,24 @@ package struct PendingAction: Identifiable {
         sweepError = nil
         let now = Date()
         for container in plan.stop + plan.remove { actedOn[container.id] = now }
-        let total = plan.stop.count + plan.remove.count
+        let failures = await stopAndRemove(stop: plan.stop, remove: plan.remove)
+        busy = false
+        await refresh()
+        if !failures.isEmpty { sweepError = "Some containers were not cleaned up. " + failures.joined(separator: "; ") }
+    }
+    private func stopAndRemove(stop: [Container], remove: [Container]) async -> [String] {
+        let total = stop.count + remove.count
         var done = 0
         var failures: [String] = []
-        for start in stride(from: 0, to: plan.stop.count, by: 8) {
-            let batch = Array(plan.stop[start..<min(start + 8, plan.stop.count)])
-            sweepProgress = SweepProgress(done: done, total: total, activity: "Stopping \(plan.stop.count) containers…")
+        for start in stride(from: 0, to: stop.count, by: 8) {
+            let batch = Array(stop[start..<min(start + 8, stop.count)])
+            sweepProgress = SweepProgress(done: done, total: total, activity: "Stopping \(stop.count) containers…")
             do { _ = try await backend.docker(["stop"] + batch.map(\.id), timeout: 120) } catch {
                 failures.append(error.localizedDescription)
             }
             done += batch.count
         }
-        for container in plan.remove {
+        for container in remove {
             sweepProgress = SweepProgress(done: done, total: total, activity: "Removing \(container.name)…")
             do { _ = try await backend.docker(["rm", container.id], timeout: 60) } catch {
                 failures.append(container.name + ": " + error.localizedDescription)
@@ -760,9 +786,7 @@ package struct PendingAction: Identifiable {
             done += 1
         }
         sweepProgress = nil
-        busy = false
-        await refresh()
-        if !failures.isEmpty { sweepError = "Some containers were not cleaned up. " + failures.joined(separator: "; ") }
+        return failures
     }
 }
 
