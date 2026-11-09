@@ -6,6 +6,7 @@ import Testing
 struct UnusedContainersTests {
     // Fake docker and lsof executables serve a fixed set of containers. Any
     // docker command other than a read is recorded in `changes` and fails.
+    // FAKE_DOCKER_REMOVED names a container removed while the scan runs.
     private let docker = #"""
         #!/bin/sh
         dir="$FAKE_DOCKER_DIR"
@@ -14,13 +15,18 @@ struct UnusedContainersTests {
         if [ "${FAKE_DOCKER_FAIL:-}" = "$1" ]; then echo "synthetic Docker failure" >&2; exit 1; fi
         case "$1" in
           ps) cat "$dir/ids" ;;
-          inspect) cat "$dir/inspect.json" ;;
+          inspect)
+            cat "$dir/inspect.json"
+            if [ -n "${FAKE_DOCKER_REMOVED:-}" ]; then echo "error: no such object: gone00000001" >&2; exit 1; fi ;;
           stats)
             calls=$(($(cat "$dir/stats-calls" 2>/dev/null || echo 0) + 1))
             echo "$calls" >"$dir/stats-calls"
             cat "$dir/stats$calls" ;;
           logs)
             eval "id=\${$#}"
+            if [ "$id" = "${FAKE_DOCKER_REMOVED:-}" ]; then
+              echo "Error response from daemon: No such container: $id" >&2; exit 1
+            fi
             # Like Postgres, write the log line to stderr.
             if [ -f "$dir/logs/$id" ]; then cat "$dir/logs/$id" >&2; fi ;;
           *) echo "$*" >>"$dir/changes"; exit 1 ;;
@@ -149,6 +155,15 @@ struct UnusedContainersTests {
         let (groups, _) = try await scan(["FAKE_LSOF_MODE": "empty"])
 
         #expect(groups.first { $0.name == "busy-pg" }?.verdict == .idle)
+    }
+
+    // Test suites create and remove containers constantly, so some vanish
+    // between listing and inspecting or reading their logs.
+    @Test func scanSkipsContainersRemovedDuringTheScan() async throws {
+        let (groups, _) = try await scan(["FAKE_DOCKER_REMOVED": "idle00000001"])
+
+        #expect(groups.count == 7)
+        #expect(groups.first { $0.name == "fresh-pg" }?.verdict == .recent)
     }
 
     // A failed probe must not look like an empty or idle result.
