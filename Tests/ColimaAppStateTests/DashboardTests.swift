@@ -388,6 +388,49 @@ private actor ResultGate<Value> {
         #expect(second == ["stop idle1", "rm idle1"])
         #expect(!model.busy && model.sweepProgress == nil)
     }
+    @Test func removeAllStopsAndRemovesOnlyListedContainersWithoutForce() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let docker = directory.appendingPathComponent("docker")
+        let log = directory.appendingPathComponent("changes")
+        try Data(
+            """
+            #!/bin/sh
+            shift 2
+            echo "$*" >>"\(log.path)"
+            """.utf8
+        ).write(to: docker)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: docker.path)
+        let vm = #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#
+        let state = try Snapshot.decode(
+            vm: vm,
+            containers: """
+                {"ID":"busy1","Names":"in-use-db","Image":"postgres","State":"running","Status":"Up","Ports":"","Labels":""}
+                {"ID":"web1","Names":"app-web-1","Image":"web","State":"running","Status":"Up","Ports":"","Labels":"com.docker.compose.project=app"}
+                {"ID":"done1","Names":"old","Image":"web","State":"exited","Status":"Exited (0)","Ports":"","Labels":""}
+                """, stats: "")
+        let model = Dashboard(
+            backend: Backend(
+                toolchain: Toolchain(environment: [
+                    "COLIMA_MINI_DOCKER": docker.path, "COLIMA_MINI_COLIMA": "/usr/bin/true",
+                ])),
+            readSnapshot: { state })
+        model.snapshot = state
+
+        model.requestRemoveAll()
+        let action = try #require(model.pending)
+        #expect(action.destructive)
+        #expect(action.message.contains("in-use-db, old"))
+        await model.perform(action)
+
+        let changes = try String(contentsOf: log, encoding: .utf8).split(separator: "\n").map(String.init)
+        let stopped = Set(changes.filter { $0.hasPrefix("stop ") }.flatMap { $0.split(separator: " ").dropFirst() }.map(String.init))
+        #expect(stopped == ["busy1", "web1"])
+        #expect(changes.filter { $0.hasPrefix("rm ") }.sorted() == ["rm busy1", "rm done1", "rm web1"])
+        #expect(!changes.contains { $0.contains("-f") || $0.contains("-v") }, "\(changes)")
+        #expect(model.error == nil && !model.busy)
+    }
     @Test func reopeningTheSameContainerKeepsOneBackStep() async throws {
         let model = Dashboard(backend: backend())
         model.navigate(.volumes)

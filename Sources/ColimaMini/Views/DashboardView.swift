@@ -23,7 +23,7 @@ struct DashboardView: View {
                 page.frame(maxWidth: .infinity, maxHeight: .infinity)
                 HStack(spacing: 8) {
                     if model.refreshing || model.busy { ProgressView().controlSize(.small) }
-                    Text(model.busy ? "Applying action…" : "Context: colima")
+                    Text(model.busy ? model.sweepProgress?.activity ?? "Applying action…" : "Context: colima")
                     if !model.busy, let snapshot = model.snapshot, snapshot.vm.running {
                         Button {
                             model.navigate(.overview)
@@ -151,6 +151,10 @@ struct ContainersView: View {
                             : "Folder deleted: " + orphaned.joined(separator: ", ")
                     )
                     .accessibilityIdentifier("containers.sweep")
+                    Button("Remove all…", role: .destructive) { model.requestRemoveAll() }
+                        .disabled(model.busy || model.scanning || model.containers.isEmpty)
+                        .help("Stop and remove every container, even ones in use. Volumes are kept.")
+                        .accessibilityIdentifier("containers.removeAll")
                 }
                 RefreshButton(busy: model.refreshing || model.busy) { await model.refresh() }
             }.padding(20)
