@@ -32,13 +32,13 @@ package struct Backend {
     }
     private func command(
         _ name: String, _ arguments: [String], timeout: Double = 15,
-        outputPolicy: Command.OutputPolicy = .stdout
+        outputPolicy: Command.OutputPolicy = .stdout, ignoredError: (@Sendable (Substring) -> Bool)? = nil
     ) async throws
         -> String
     {
         try await Command.run(
             toolchain.executable(name), arguments, timeout: timeout, environment: toolchain.environment,
-            outputPolicy: outputPolicy)
+            outputPolicy: outputPolicy, ignoredError: ignoredError)
     }
     package func apply(_ resources: ResourceSettings, restart: Bool) async throws {
         guard fixture == nil else {
@@ -82,13 +82,14 @@ package struct Backend {
     }
     package func docker(
         _ arguments: [String], timeout: Double = 15,
-        outputPolicy: Command.OutputPolicy = .stdout
+        outputPolicy: Command.OutputPolicy = .stdout, ignoredError: (@Sendable (Substring) -> Bool)? = nil
     ) async throws -> String {
         guard fixture == nil else {
             throw AppError.message("Runtime actions are disabled in sample mode.")
         }
         return try await command(
-            "docker", ["--context", "colima"] + arguments, timeout: timeout, outputPolicy: outputPolicy)
+            "docker", ["--context", "colima"] + arguments, timeout: timeout, outputPolicy: outputPolicy,
+            ignoredError: ignoredError)
     }
     private func inventory() async throws -> Snapshot {
         let vmOutput = try await command("colima", ["list", "--json"])
@@ -138,10 +139,12 @@ package struct Backend {
         if let fixture { return fixture.sweepGroups ?? [] }
         let ids = try await docker(["ps", "-aq"]).split(whereSeparator: \.isWhitespace).map(String.init)
         guard !ids.isEmpty else { return [] }
+        // Containers removed after `ps` (test databases come and go) are
+        // skipped; Docker still prints the ones that exist.
         let containers: [UnusedContainerScan.Inspected]
         do {
-            containers = try JSONDecoder().decode(
-                [UnusedContainerScan.Inspected].self, from: Data(try await docker(["inspect"] + ids).utf8))
+            let output = try await docker(["inspect"] + ids) { $0.lowercased().contains("no such object") }
+            containers = try JSONDecoder().decode([UnusedContainerScan.Inspected].self, from: Data(output.utf8))
         } catch let error as AppError {
             throw error
         } catch {
@@ -159,7 +162,12 @@ package struct Backend {
             traffic: UnusedContainerScan.traffic(before: before, after: after)
         ) { id in
             // Many images, Postgres included, log to stderr.
-            let line = try await docker(["logs", "--timestamps", "--tail", "1", id], outputPolicy: .combined)
+            let line: String
+            do {
+                line = try await docker(["logs", "--timestamps", "--tail", "1", id], outputPolicy: .combined)
+            } catch AppError.message(let text) where text.lowercased().contains("no such container") {
+                return nil  // Removed during the scan.
+            }
             return DockerDate.parse(line.split(separator: " ", maxSplits: 1).first.map(String.init))
         }
     }

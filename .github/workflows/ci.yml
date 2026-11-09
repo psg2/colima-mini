@@ -46,8 +46,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The oldest supported macOS on Apple Silicon, and Intel.
-        runner: [macos-14, macos-15-intel]
+        # The oldest hosted macOS on Apple Silicon, and Intel. GitHub retired
+        # the macos-14 image, so macOS 14 itself is no longer tested in CI.
+        runner: [macos-15, macos-15-intel]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
@@ -56,7 +57,7 @@ jobs:
           persist-credentials: false
       - name: Install pinned repository tools
         uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
-      # macOS 14 images default to Xcode 15 (Swift 5.10); the package needs Swift 6.
+      # The package needs Swift 6; pin the newest Xcode 16 the image has.
       - name: Select the newest Xcode 16
         run: |
           xcode_path=$(find /Applications -maxdepth 1 -type d -name 'Xcode_16*.app' | sort -V | tail -1)
