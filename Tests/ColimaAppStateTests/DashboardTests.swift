@@ -421,7 +421,7 @@ private actor ResultGate<Value> {
         model.requestRemoveAll()
         let action = try #require(model.pending)
         #expect(action.destructive)
-        #expect(action.message.contains("in-use-db, old"))
+        #expect(Set(action.containers.map(\.id)) == ["busy1", "web1", "done1"])
         await model.perform(action)
 
         let changes = try String(contentsOf: log, encoding: .utf8).split(separator: "\n").map(String.init)

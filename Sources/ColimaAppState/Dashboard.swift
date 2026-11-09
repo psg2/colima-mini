@@ -15,6 +15,8 @@ package struct PendingAction: Identifiable {
         compose?.title ?? ["rm": "Remove", Self.removeAll: "Stop and remove all"][verb] ?? verb.capitalized
     }
     package static let removeAll = "removeAll"
+    // Too many containers for a system dialog: the app shows them in a sheet.
+    package var listsContainers: Bool { verb == Self.removeAll }
     package var destructive: Bool { compose?.destructive ?? (verb != "start") }
     package init(
         title: String, message: String, verb: String, containers: [Container], vm: Bool,
@@ -634,8 +636,7 @@ package struct PendingAction: Identifiable {
         pending = PendingAction(
             title: "Stop and remove all \(containers.count) container\(containers.count == 1 ? "" : "s")?",
             message: "\(running) running are stopped first, even ones in use. Logs and container files are "
-                + "deleted; volumes are kept, so tools that need these containers can create them again.\n\n"
-                + containers.map(\.name).sorted().joined(separator: ", "),
+                + "deleted; volumes are kept, so tools that need these containers can create them again.",
             verb: PendingAction.removeAll, containers: containers, vm: false)
     }
     // Compose runs against the whole project, including services that have no
