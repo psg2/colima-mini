@@ -17,10 +17,12 @@ package final class Command: @unchecked Sendable {
         if let child, child.isRunning { child.terminate() }
     }
     // `emptyStatus` is an exit status that means "nothing found" when the
-    // command printed nothing, as lsof's 1.
+    // command printed nothing, as lsof's 1. A failure whose every error line
+    // passes `ignoredError` returns the output it printed anyway.
     package func execute(
         _ executable: String, _ arguments: [String], timeout: Double,
-        environment: [String: String], outputPolicy: OutputPolicy = .stdout, emptyStatus: Int32? = nil
+        environment: [String: String], outputPolicy: OutputPolicy = .stdout, emptyStatus: Int32? = nil,
+        ignoredError: ((Substring) -> Bool)? = nil
     ) throws -> String {
         guard FileManager.default.isExecutableFile(atPath: executable) else {
             throw AppError.message(
@@ -105,6 +107,10 @@ package final class Command: @unchecked Sendable {
         if let emptyStatus, child.terminationStatus == emptyStatus, text.isEmpty, errorText.isEmpty {
             return ""
         }
+        if child.terminationStatus != 0, outputPolicy == .stdout, let ignoredError {
+            let lines = errorText.split(whereSeparator: \.isNewline)
+            if !lines.isEmpty, lines.allSatisfy(ignoredError) { return text }
+        }
         guard child.terminationStatus == 0 else {
             throw AppError.message(
                 (outputPolicy == .combined ? text : errorText)
@@ -185,14 +191,15 @@ package final class Command: @unchecked Sendable {
     }
     package static func run(
         _ executable: String, _ arguments: [String], timeout: Double = 15,
-        environment: [String: String] = [:], outputPolicy: OutputPolicy = .stdout, emptyStatus: Int32? = nil
+        environment: [String: String] = [:], outputPolicy: OutputPolicy = .stdout, emptyStatus: Int32? = nil,
+        ignoredError: (@Sendable (Substring) -> Bool)? = nil
     ) async throws -> String {
         let command = Command()
         return try await withTaskCancellationHandler {
             try await Task.detached(priority: .utility) {
                 try command.execute(
                     executable, arguments, timeout: timeout, environment: environment,
-                    outputPolicy: outputPolicy, emptyStatus: emptyStatus)
+                    outputPolicy: outputPolicy, emptyStatus: emptyStatus, ignoredError: ignoredError)
             }.value
         } onCancel: {
             command.cancel()
