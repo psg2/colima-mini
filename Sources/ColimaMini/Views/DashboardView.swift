@@ -66,7 +66,7 @@ struct DashboardView: View {
         .confirmationDialog(
             model.pending?.title ?? "Confirm action",
             isPresented: Binding(
-                get: { model.pending != nil && !model.showingSweep },
+                get: { model.pending.map { !$0.listsContainers } == true && !model.showingSweep },
                 set: { if !$0 { model.pending = nil } }),
             titleVisibility: .visible
         ) {
@@ -83,6 +83,13 @@ struct DashboardView: View {
         .onDisappear { DockIcon.windowClosed() }
         .sheet(isPresented: $model.showingSweep) { UnusedContainersView(model: model) }
         .sheet(isPresented: $model.showingReclaim) { ReclaimView(model: model) }
+        .sheet(
+            item: Binding(
+                get: { model.pending.flatMap { $0.listsContainers ? $0 : nil } },
+                set: { if $0 == nil { model.pending = nil } })
+        ) { action in
+            ConfirmContainersView(model: model, action: action)
+        }
         .task {
             await model.refresh()
             if model.storage == nil { await model.loadStorage() }
