@@ -8,6 +8,8 @@ package struct Container: Decodable, Identifiable {
     package let status: String
     package let ports: String
     package let labels: String
+    // Parsed once: list rows read labels on every render.
+    package let labelMap: [String: String]
     enum CodingKeys: String, CodingKey {
         case dockerID = "ID"
         case name = "Names"
@@ -18,21 +20,41 @@ package struct Container: Decodable, Identifiable {
         case labels = "Labels"
     }
 
+    package init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        dockerID = try values.decode(String.self, forKey: .dockerID)
+        name = try values.decode(String.self, forKey: .name)
+        image = try values.decode(String.self, forKey: .image)
+        state = try values.decode(String.self, forKey: .state)
+        status = try values.decode(String.self, forKey: .status)
+        ports = try values.decode(String.self, forKey: .ports)
+        labels = try values.decode(String.self, forKey: .labels)
+        var map: [String: String] = [:]
+        for pair in labels.components(separatedBy: ",") {
+            let parts = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+            if parts.count == 2, map[parts[0]] == nil { map[parts[0]] = parts[1] }
+        }
+        labelMap = map
+    }
+
     package var id: String { dockerID }
     package var running: Bool { state == "running" }
-    package func label(_ key: String) -> String? {
-        let prefix = key + "="
-        return labels.components(separatedBy: ",").first(where: { $0.hasPrefix(prefix) })
-            .map { String($0.dropFirst(prefix.count)) }
+    package func label(_ key: String) -> String? { labelMap[key] }
+    // Compose project, else the Testcontainers session, else Standalone.
+    package var project: String { Testcontainers.project(name: name, labels: labelMap) ?? "Standalone" }
+    package var testcontainersSession: String? { Testcontainers.session(name: name, labels: labelMap) }
+    package var isRyuk: Bool { Testcontainers.isRyuk(name: name, image: image, labels: labelMap) }
+    // Compose's folder, else the folder named by the owner label.
+    private var workingDirectory: String? {
+        label("com.docker.compose.project.working_dir") ?? label(OwnerLabel.workingDirectory)
     }
-    package var project: String { label("com.docker.compose.project") ?? "Standalone" }
     package var service: String { label("com.docker.compose.service") ?? name }
     package var needsAttention: Bool { condition.failed }
     package var folder: URL? {
-        label("com.docker.compose.project.working_dir").map { URL(fileURLWithPath: $0) }
+        workingDirectory.map { URL(fileURLWithPath: $0) }
     }
     package var origin: ProjectOrigin? {
-        label("com.docker.compose.project.working_dir").flatMap {
+        workingDirectory.flatMap {
             $0.hasPrefix("/") ? ProjectOrigin(path: $0) : nil
         }
     }

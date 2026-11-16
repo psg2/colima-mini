@@ -388,6 +388,112 @@ private actor ResultGate<Value> {
         #expect(second == ["stop idle1", "rm idle1"])
         #expect(!model.busy && model.sweepProgress == nil)
     }
+    // Docker that records every command; the background checks must not run any.
+    private func recordingDocker() throws -> (backend: Backend, log: URL, cleanup: () -> Void) {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let docker = directory.appendingPathComponent("docker")
+        let log = directory.appendingPathComponent("commands")
+        try Data("#!/bin/sh\necho \"$*\" >>\"\(log.path)\"\n".utf8).write(to: docker)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: docker.path)
+        let backend = Backend(
+            toolchain: Toolchain(environment: [
+                "COLIMA_MINI_DOCKER": docker.path, "COLIMA_MINI_COLIMA": "/usr/bin/true",
+            ]))
+        return (backend, log, { try? FileManager.default.removeItem(at: directory) })
+    }
+    private func leaked(_ ids: [String], cpu: String = "0.00%") throws -> Snapshot {
+        let vm = #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#
+        let rows = (ids + ["keep1"]).map { id in
+            #"{"ID":"\#(id)","Names":"\#(id)","Image":"postgres","State":"running","Status":"Up","Ports":"","Labels":"org.testcontainers.session-id=aaaa1111"}"#
+        }
+        return try Snapshot.decode(
+            vm: vm, containers: rows.joined(separator: "\n"),
+            stats: #"{"ID":"keep1","CPUPerc":"\#(cpu)","MemUsage":"1MiB / 2GiB","MemPerc":"0.1%"}"#)
+    }
+    @Test func backgroundScanNotifiesOncePerNewOrphanAndOnlyOpensTheReview() async throws {
+        let (backend, log, cleanup) = try recordingDocker()
+        defer { cleanup() }
+        var orphanIDs = ["tc1", "tc2"]
+        let model = Dashboard(
+            backend: backend,
+            readUnused: {
+                [
+                    SweepGroup(
+                        verdict: .orphan, name: "testcontainers aaaa1111", project: "testcontainers aaaa1111",
+                        reason: "Ryuk gone", containerIDs: orphanIDs),
+                    SweepGroup(verdict: .active, name: "keep1", project: nil, reason: "", containerIDs: ["keep1"]),
+                ]
+            })
+        var alerts: [CleanupAlert] = []
+        model.onCleanupAlert = { alerts.append($0) }
+        model.snapshot = try leaked(["tc1", "tc2", "tc3"])
+
+        await model.backgroundScan()
+        await model.backgroundScan()
+        #expect(alerts == [.orphans(containers: 2, groups: ["testcontainers aaaa1111"])])
+        #expect(model.orphanCount == 2)
+        #expect(!model.showingSweep, "a background scan does not open the review")
+
+        orphanIDs.append("tc3")
+        await model.backgroundScan()
+        #expect(alerts.count == 2)
+        #expect(alerts.last == .orphans(containers: 3, groups: ["testcontainers aaaa1111"]))
+
+        model.presentUnused()
+        #expect(model.showingSweep)
+        #expect(model.sweepSelection == ["testcontainers aaaa1111"])
+        #expect(model.sweepPlan.remove.map(\.id).sorted() == ["tc1", "tc2", "tc3"])
+        #expect(!FileManager.default.fileExists(atPath: log.path), "nothing ran before confirmation")
+
+        model.snapshot = try leaked([])
+        #expect(model.orphanCount == 0, "removed orphans leave the badge")
+    }
+    @Test func sampleModeNeverScansInTheBackground() async throws {
+        let fixture = try JSONDecoder().decode(
+            Fixture.self,
+            from: Data(
+                #"{"vm":"{\"name\":\"default\",\"status\":\"Running\",\"cpus\":2,\"memory\":1073741824}","containers":"","stats":""}"#
+                    .utf8))
+        var scans = 0
+        let model = Dashboard(
+            backend: Backend(fixture: fixture),
+            readUnused: {
+                scans += 1
+                return []
+            })
+        await model.refresh()
+        await model.backgroundScan()
+        model.presentUnused()
+        #expect(scans == 0)
+        #expect(model.backgroundScanInterval == 0)
+    }
+    @Test func sustainedHighCPUAlertsOnceAndRefreshesTheScan() async throws {
+        let (backend, log, cleanup) = try recordingDocker()
+        defer { cleanup() }
+        var cpu = "950.00%"
+        var scans = 0
+        let model = Dashboard(
+            backend: backend, readSnapshot: { try self.leaked([], cpu: cpu) },
+            readUnused: {
+                scans += 1
+                return []
+            })
+        model.cpuWatch = SustainedLoad(threshold: 80, duration: 0)
+        var alerts: [CleanupAlert] = []
+        model.onCleanupAlert = { alerts.append($0) }
+
+        await model.refresh()
+        await model.refresh()
+        #expect(alerts == [.highCPU(percent: 95, minutes: 0)])
+        #expect(model.cpuHigh)
+        while scans == 0 { await Task.yield() }
+
+        cpu = "10.00%"
+        await model.refresh()
+        #expect(!model.cpuHigh)
+        #expect(!FileManager.default.fileExists(atPath: log.path))
+    }
     @Test func removeAllStopsAndRemovesOnlyListedContainersWithoutForce() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

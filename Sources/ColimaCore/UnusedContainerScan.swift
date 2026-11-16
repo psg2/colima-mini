@@ -1,9 +1,13 @@
 import Foundation
 
-// Finds containers nobody is using. Containers are grouped by Compose project
-// (standalone containers are their own group) and each group gets one verdict:
+// Finds containers nobody is using. Containers are grouped by Compose project,
+// then by Testcontainers session; other containers are their own group. Each
+// group gets one verdict:
 //
-//   orphan   its Compose folder no longer exists (a deleted worktree)
+//   orphan   its owner is gone: the Compose or `dev.owner.working_dir` folder
+//            no longer exists, the `dev.owner.pid` process exited, or its
+//            Testcontainers session has no running Ryuk. Containers whose
+//            owner is gone leave their group as a separate orphan group.
 //   active   a host process is connected to a published port, or the
 //            containers sent or received traffic during the sample
 //   idle     running, but nothing connected, no traffic and no log line for
@@ -22,6 +26,7 @@ package enum UnusedContainerScan {
         let running: Bool
         let startedAt: Date?
         let finishedAt: Date?
+        let image: String
         let labels: [String: String]
         let hostPorts: [String]
 
@@ -35,7 +40,8 @@ package enum UnusedContainerScan {
         }
         private struct Config: Decodable {
             let labels: [String: String]?
-            enum CodingKeys: String, CodingKey { case labels = "Labels" }
+            let image: String?
+            enum CodingKeys: String, CodingKey { case labels = "Labels", image = "Image" }
         }
         private struct Binding: Decodable {
             let hostPort: String?
@@ -60,12 +66,28 @@ package enum UnusedContainerScan {
             running = state.running
             startedAt = DockerDate.parse(state.startedAt)
             finishedAt = DockerDate.parse(state.finishedAt)
-            labels = try values.decode(Config.self, forKey: .config).labels ?? [:]
+            let config = try values.decode(Config.self, forKey: .config)
+            labels = config.labels ?? [:]
+            image = config.image ?? ""
             hostPorts = (network?.ports ?? [:]).values.flatMap { $0 ?? [] }.compactMap(\.hostPort)
         }
 
         var project: String? { labels["com.docker.compose.project"] }
         var workingDirectory: String? { labels["com.docker.compose.project.working_dir"] }
+        var session: String? { Testcontainers.session(name: name, labels: labels) }
+        var isRyuk: Bool { Testcontainers.isRyuk(name: name, image: image, labels: labels) }
+        var ownerPID: Int32? { OwnerLabel.pid(in: labels) }
+        // The Compose project or the session's project name.
+        var owningProject: String? { Testcontainers.project(name: name, labels: labels) }
+
+        // Why this container's owner is gone, if it is.
+        func ownerGone(folderExists: (String) -> Bool, processAlive: (Int32) -> Bool) -> String? {
+            if let folder = labels[OwnerLabel.workingDirectory], !folder.isEmpty, !folderExists(folder) {
+                return "owner folder gone: \(folder)"
+            }
+            if let pid = ownerPID, !processAlive(pid) { return "owner process \(pid) exited" }
+            return nil
+        }
     }
 
     // Published host port -> processes on the Mac connected to it, from
@@ -107,25 +129,45 @@ package enum UnusedContainerScan {
         _ containers: [Inspected], clients: [String: [String]], traffic: Set<String>,
         idleFor: TimeInterval = 86_400, now: Date = Date(),
         folderExists: (String) -> Bool = { ProjectOrigin(path: $0).exists() },
+        processAlive: (Int32) -> Bool = OwnerLabel.processAlive,
         lastLog: (String) async throws -> Date?
     ) async rethrows -> [SweepGroup] {
         var order: [String] = []
         var members: [String: [Inspected]] = [:]
         for container in containers {
-            let key = container.project ?? container.name
+            let key = container.owningProject ?? container.name
             if members[key] == nil { order.append(key) }
             members[key, default: []].append(container)
         }
         var groups: [SweepGroup] = []
         for key in order {
             let group = members[key] ?? []
+            let project = group[0].owningProject
+            var gone: [String] = []
+            var goneIDs: [String] = []
+            var rest: [Inspected] = []
+            for container in group {
+                if let reason = container.ownerGone(folderExists: folderExists, processAlive: processAlive) {
+                    if !gone.contains(reason) { gone.append(reason) }
+                    goneIDs.append(container.id)
+                } else {
+                    rest.append(container)
+                }
+            }
+            if !goneIDs.isEmpty {
+                let reason = gone.count == 1 ? gone[0] : "\(gone[0]) and \(gone.count - 1) more"
+                groups.append(
+                    SweepGroup(
+                        verdict: .orphan, name: rest.isEmpty ? key : key + " · owner gone", project: project,
+                        reason: reason, containerIDs: goneIDs))
+            }
+            guard !rest.isEmpty else { continue }
             let (verdict, reason) = try await judge(
-                group, clients: clients, traffic: traffic, idleFor: idleFor, now: now,
+                rest, clients: clients, traffic: traffic, idleFor: idleFor, now: now,
                 folderExists: folderExists, lastLog: lastLog)
             groups.append(
                 SweepGroup(
-                    verdict: verdict, name: key, project: group[0].project, reason: reason,
-                    containerIDs: group.map(\.id)))
+                    verdict: verdict, name: key, project: project, reason: reason, containerIDs: rest.map(\.id)))
         }
         let rank = Dictionary(uniqueKeysWithValues: SweepVerdict.allCases.enumerated().map { ($1, $0) })
         return groups.sorted { (rank[$0.verdict]!, $0.name) < (rank[$1.verdict]!, $1.name) }
@@ -135,9 +177,29 @@ package enum UnusedContainerScan {
         _ group: [Inspected], clients: [String: [String]], traffic: Set<String>, idleFor: TimeInterval,
         now: Date, folderExists: (String) -> Bool, lastLog: (String) async throws -> Date?
     ) async rethrows -> (SweepVerdict, String) {
-        if let folder = group[0].workingDirectory, !folderExists(folder) {
+        if let folder = group[0].workingDirectory, !folder.isEmpty, !folderExists(folder) {
             return (.orphan, "folder gone: \(folder)")
         }
+        var prefix = ""
+        if group[0].project == nil, let session = group[0].session {
+            switch Testcontainers.reaper(
+                ryukRunning: group.contains { $0.running && $0.isRyuk },
+                hasOwnerPID: group.contains { $0.ownerPID != nil })
+            {
+            case .alive: prefix = "Ryuk alive · "
+            case .ownerRunning: prefix = "Ryuk gone, owner running · "
+            case .gone: return (.orphan, "Ryuk gone: nothing will remove session \(session.prefix(12))")
+            }
+        }
+        let (verdict, reason) = try await activity(
+            group, clients: clients, traffic: traffic, idleFor: idleFor, now: now, lastLog: lastLog)
+        return (verdict, prefix + reason)
+    }
+
+    private static func activity(
+        _ group: [Inspected], clients: [String: [String]], traffic: Set<String>, idleFor: TimeInterval,
+        now: Date, lastLog: (String) async throws -> Date?
+    ) async rethrows -> (SweepVerdict, String) {
         let running = group.filter(\.running)
         if running.isEmpty {
             // A container created but never started has no finish time.

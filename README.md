@@ -52,8 +52,13 @@ one app and leaves Gatekeeper on.
 - **Container pages.** Live logs with search, wrap and pause; ports; mounts;
   environment variables with secrets masked. **Shell** and **Open** use the
   terminal and editor you pick from their menus.
-- **Unused containers.** **Review unused containers** finds stacks whose folder
-  was deleted, stopped for over a day, or idle, and cleans up the ones you pick in one step.
+- **Unused containers.** **Review unused containers** finds containers whose owner
+  is gone (deleted folder, exited creator process, or a Testcontainers session
+  whose Ryuk died), stopped for over a day, or idle, and cleans up the ones you
+  pick in one confirmed step. Testcontainers sessions show as their own projects
+  with their Ryuk status. A background scan, every 15 minutes by default, marks
+  the menu bar and notifies when orphans appear or Colima's CPU stays high; it
+  never removes anything.
 - **Images, volumes and networks.** Sizes, which containers use each one, and
   removal of the unused ones, singly or in bulk. Docker refuses anything still in use.
 - **Disk.** Storage shows the VM disk, Docker's usage and the space taken on your
@@ -65,6 +70,20 @@ one app and leaves Gatekeeper on.
 - **Menu bar.** Status, usage, containers that need attention and every project
   with its actions. Notifications when a container crashes, fails its health
   check or keeps restarting.
+
+### Owner labels
+
+Tools that create containers outside Compose can say who owns them, so the scan
+can tell when nobody will come back for them:
+
+| Label | Value | Orphaned when |
+| --- | --- | --- |
+| `dev.owner.working_dir` | Absolute folder the container belongs to, such as a worktree. Also shown as its origin. | The folder no longer exists. |
+| `dev.owner.pid` | PID, on this Mac, of the process that created the container. | That process has exited. |
+
+```sh
+docker run --label dev.owner.working_dir="$PWD" --label dev.owner.pid=$$ postgres:18
+```
 
 The [user guide](docs/guide.md) covers each page, and
 [storage and cleanup](docs/storage.md) explains the measurements and what each

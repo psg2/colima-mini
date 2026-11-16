@@ -47,7 +47,40 @@ struct UnusedContainersTests {
         OUT
         """#
 
-    private func scan(_ environment: [String: String] = [:]) async throws -> (groups: [SweepGroup], changes: String?) {
+    private static func ago(_ seconds: TimeInterval) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: Date().addingTimeInterval(-seconds)).replacingOccurrences(
+            of: "Z", with: ".123456789Z")
+    }
+    private static func container(
+        _ id: String, _ name: String, project: String? = nil, folder: String? = nil, port: String? = nil,
+        image: String = "postgres:18", labels: [String: String] = [:], started: TimeInterval,
+        finished: TimeInterval? = nil
+    ) -> [String: Any] {
+        let compose =
+            project.map {
+                ["com.docker.compose.project": $0, "com.docker.compose.project.working_dir": folder ?? ""]
+            } ?? [:]
+        return [
+            "Id": id, "Name": "/" + name, "Created": ago(started),
+            "State": [
+                "Running": finished == nil, "StartedAt": ago(started),
+                "FinishedAt": finished.map(ago) ?? "0001-01-01T00:00:00Z",
+            ],
+            "Config": ["Image": image, "Labels": compose.merging(labels) { $1 }],
+            "NetworkSettings": [
+                "Ports": port.map { ["5432/tcp": [["HostIp": "127.0.0.1", "HostPort": $0]]] } ?? [:]
+            ],
+        ]
+    }
+
+    // `extra` adds containers to the fixed set; `extraRunning` lists which of
+    // them are running, so `docker stats` reports them.
+    private func scan(
+        _ environment: [String: String] = [:], extra: (_ live: String) -> [[String: Any]] = { _ in [] },
+        extraRunning: [String] = []
+    ) async throws -> (groups: [SweepGroup], changes: String?) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "colima-unused-" + UUID().uuidString)
         let live = directory.appendingPathComponent("live-project")
@@ -56,60 +89,38 @@ struct UnusedContainersTests {
         try FileManager.default.createDirectory(at: live, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        func ago(_ seconds: TimeInterval) -> String {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime]
-            return formatter.string(from: Date().addingTimeInterval(-seconds)).replacingOccurrences(
-                of: "Z", with: ".123456789Z")
-        }
         let day: TimeInterval = 86_400
         func container(
             _ id: String, _ name: String, project: String? = nil, folder: String? = nil, port: String? = nil,
             started: TimeInterval, finished: TimeInterval? = nil
         ) -> [String: Any] {
-            [
-                "Id": id, "Name": "/" + name, "Created": ago(started),
-                "State": [
-                    "Running": finished == nil, "StartedAt": ago(started),
-                    "FinishedAt": finished.map(ago) ?? "0001-01-01T00:00:00Z",
-                ],
-                "Config": [
-                    "Labels": project.map {
-                        [
-                            "com.docker.compose.project": $0,
-                            "com.docker.compose.project.working_dir": folder ?? "",
-                        ]
-                    } ?? [:]
-                ],
-                "NetworkSettings": [
-                    "Ports": port.map { ["5432/tcp": [["HostIp": "127.0.0.1", "HostPort": $0]]] } ?? [:]
-                ],
-            ]
+            Self.container(id, name, project: project, folder: folder, port: port, started: started, finished: finished)
         }
-        let containers = [
-            container("orphan000001", "gone-db-1", project: "gone", folder: "/nonexistent/worktree", started: 3 * day),
-            container("orphan000002", "gone-web-1", project: "gone", folder: "/nonexistent/worktree", started: 3 * day),
-            container("busy00000001", "busy-pg", port: "55001", started: 5 * day),
-            container("chatty000001", "chatty", started: 5 * day),
-            container("idle00000001", "old-db-1", project: "old", folder: live.path, started: 5 * day),
-            container("fresh0000001", "fresh-pg", port: "55003", started: 5 * day),
-            container(
-                "stale0000001", "stale-db-1", project: "stale", folder: live.path, started: 9 * day, finished: 8 * day),
-            container("paused000001", "paused-pg", started: 2 * day, finished: 1_800),
-        ]
+        let containers =
+            [
+                container("orphan000001", "gone-db-1", project: "gone", folder: "/nonexistent/worktree", started: 3 * day),
+                container("orphan000002", "gone-web-1", project: "gone", folder: "/nonexistent/worktree", started: 3 * day),
+                container("busy00000001", "busy-pg", port: "55001", started: 5 * day),
+                container("chatty000001", "chatty", started: 5 * day),
+                container("idle00000001", "old-db-1", project: "old", folder: live.path, started: 5 * day),
+                container("fresh0000001", "fresh-pg", port: "55003", started: 5 * day),
+                container(
+                    "stale0000001", "stale-db-1", project: "stale", folder: live.path, started: 9 * day, finished: 8 * day),
+                container("paused000001", "paused-pg", started: 2 * day, finished: 1_800),
+            ] + extra(live.path)
         try JSONSerialization.data(withJSONObject: containers).write(
             to: directory.appendingPathComponent("inspect.json"))
         try Data(containers.map { $0["Id"] as! String }.joined(separator: "\n").utf8).write(
             to: directory.appendingPathComponent("ids"))
-        let running = ["busy00000001", "chatty000001", "idle00000001", "fresh0000001", "orphan000001"]
+        let running = ["busy00000001", "chatty000001", "idle00000001", "fresh0000001", "orphan000001"] + extraRunning
         let stats = running.map { "\($0)\t1kB / 1kB" }.joined(separator: "\n")
         try Data(stats.utf8).write(to: directory.appendingPathComponent("stats1"))
         try Data(stats.replacingOccurrences(of: "chatty000001\t1kB", with: "chatty000001\t9kB").utf8).write(
             to: directory.appendingPathComponent("stats2"))
         for (id, line) in [
-            "busy00000001": ago(4 * day) + " LOG: checkpoint complete",
-            "idle00000001": ago(3 * day) + " LOG: checkpoint complete",
-            "fresh0000001": ago(600) + " LOG: checkpoint complete",
+            "busy00000001": Self.ago(4 * day) + " LOG: checkpoint complete",
+            "idle00000001": Self.ago(3 * day) + " LOG: checkpoint complete",
+            "fresh0000001": Self.ago(600) + " LOG: checkpoint complete",
         ] {
             try Data((line + "\n").utf8).write(to: directory.appendingPathComponent("logs/" + id))
         }
@@ -148,6 +159,61 @@ struct UnusedContainersTests {
         #expect(byName["stale"]?.reason == "not running for 8d")
         #expect(byName["paused-pg"]?.reason == "stopped 30m ago")
         #expect(byName["paused-pg"]?.project == nil)
+        #expect(changes == nil, "the scan changed containers")
+    }
+
+    // Leaked test containers: a session whose Ryuk is gone, a live session
+    // where one creator exited, and a container whose owner folder is gone.
+    @Test func scanGroupsTestcontainersBySessionAndFlagsOwnersThatAreGone() async throws {
+        let deadPID = String(try exitedPID())
+        let alivePID = String(ProcessInfo.processInfo.processIdentifier)
+        let day: TimeInterval = 86_400
+        func tc(_ session: String, _ extra: [String: String] = [:]) -> [String: String] {
+            ["org.testcontainers": "true", "org.testcontainers.session-id": session].merging(extra) { $1 }
+        }
+        let (groups, changes) = try await scan(
+            extra: { live in
+                [
+                    Self.container("tcdead000001", "brave_pg", labels: tc("deadsession01"), started: 6 * day),
+                    Self.container(
+                        "tcdead000002", "calm_redis", labels: tc("deadsession01"), started: 6 * day,
+                        finished: 5 * day),
+                    Self.container(
+                        "ryuklive0001", "testcontainers-ryuk-livesession01", image: "testcontainers/ryuk:0.11.0",
+                        started: 2 * day),
+                    Self.container(
+                        "tclive000001", "eager_pg", labels: tc("livesession01", ["dev.owner.pid": alivePID]),
+                        started: 2 * day),
+                    Self.container(
+                        "tclive000002", "lost_pg",
+                        labels: tc("livesession01", ["dev.owner.pid": deadPID, "dev.owner.working_dir": live]),
+                        started: 2 * day),
+                    Self.container(
+                        "owned0000001", "stray-api", labels: ["dev.owner.working_dir": "/nonexistent/wt"],
+                        started: day),
+                ]
+            }, extraRunning: ["tcdead000001", "ryuklive0001", "tclive000001", "tclive000002", "owned0000001"])
+
+        let byName = Dictionary(uniqueKeysWithValues: groups.map { ($0.name, $0) })
+        let dead = try #require(byName["testcontainers deadsess"])
+        #expect(dead.verdict == .orphan)
+        #expect(dead.containerIDs == ["tcdead000001", "tcdead000002"])
+        #expect(dead.reason.contains("Ryuk gone"))
+        #expect(dead.project == "testcontainers deadsess")
+
+        let lost = try #require(byName["testcontainers livesess · owner gone"])
+        #expect(lost.verdict == .orphan)
+        #expect(lost.containerIDs == ["tclive000002"])
+        #expect(lost.reason == "owner process \(deadPID) exited")
+
+        let live = try #require(byName["testcontainers livesess"])
+        #expect(live.verdict != .orphan)
+        #expect(Set(live.containerIDs) == ["ryuklive0001", "tclive000001"])
+        #expect(live.reason.hasPrefix("Ryuk alive"))
+
+        #expect(byName["stray-api"]?.verdict == .orphan)
+        #expect(byName["stray-api"]?.reason == "owner folder gone: /nonexistent/wt")
+        #expect(!groups.contains { $0.name == "Standalone" })
         #expect(changes == nil, "the scan changed containers")
     }
 

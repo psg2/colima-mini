@@ -152,6 +152,7 @@ struct SettingsView: View {
         .frame(width: 560)
         .onAppear { load() }
         .onChange(of: model.refreshInterval) { _, _ in model.savePreferences() }
+        .onChange(of: model.backgroundScanInterval) { _, _ in model.savePreferences() }
         .onChange(of: model.notificationsEnabled) { _, enabled in
             model.savePreferences()
             if enabled { Notifier.shared.requestAuthorization() }
@@ -278,10 +279,24 @@ struct SettingsView: View {
                     Text("While another app is in front, refreshes happen at most every 30 seconds.")
                         .font(.caption).foregroundStyle(.secondary)
                     Divider()
-                    Toggle("Notify when a container fails", isOn: $model.notificationsEnabled)
+                    Toggle("Notifications", isOn: $model.notificationsEnabled)
                         .disabled(model.sample).accessibilityIdentifier("settings.notifications")
                     Text(
-                        "Unexpected exits, failing health checks and restart loops. Changes made from Colima Mini don't notify."
+                        "Unexpected exits, failing health checks and restart loops, newly orphaned containers, and Colima CPU staying above \(Int(model.cpuWatch.threshold))% for \(Int(model.cpuWatch.duration / 60)) minutes. Changes made from Colima Mini don't notify."
+                    ).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Divider()
+                    HStack {
+                        Text("Check for orphaned containers")
+                        Spacer()
+                        Picker("Check for orphaned containers", selection: $model.backgroundScanInterval) {
+                            ForEach(Dashboard.backgroundScanChoices, id: \.self) {
+                                Text($0 == 0 ? "Never" : "Every \($0) minutes").tag($0)
+                            }
+                        }.labelsHidden().frame(width: 150).disabled(model.sample)
+                            .accessibilityIdentifier("settings.backgroundScan")
+                    }
+                    Text(
+                        "Runs the unused-container scan in the background and marks the menu bar when it finds orphans. It never removes anything."
                     ).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Divider()
                     Toggle("Hide the Dock icon while the window is closed", isOn: $hideDockWhenClosed)
