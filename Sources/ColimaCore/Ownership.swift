@@ -25,7 +25,8 @@ package enum OwnerLabel {
 // one Ryuk container per session, which removes the session's containers after
 // its clients disconnect. Once Ryuk is gone, nothing will remove them.
 package enum Testcontainers {
-    package static let sessionLabel = "org.testcontainers.session-id"
+    // Node and others use the first spelling; Java and Go the second.
+    package static let sessionLabels = ["org.testcontainers.session-id", "org.testcontainers.sessionId"]
     private static let ryukPrefix = "testcontainers-ryuk-"
 
     package static func isRyuk(name: String, image: String, labels: [String: String]) -> Bool {
@@ -42,11 +43,12 @@ package enum Testcontainers {
         if name.hasPrefix(ryukPrefix), name.count > ryukPrefix.count {
             return String(name.dropFirst(ryukPrefix.count))
         }
-        return labels[sessionLabel].flatMap { $0.isEmpty ? nil : $0 }
+        return sessionLabels.lazy.compactMap { labels[$0] }.first { !$0.isEmpty }
     }
-    // The project name the list and the scan show for a session.
+    // The project name the list and the scan show for a session. It keeps
+    // the whole ID: sessions sharing a prefix must stay apart.
     package static func project(session: String) -> String {
-        "testcontainers " + session.prefix(8)
+        "testcontainers " + session
     }
     // The Compose project, else the session's project name.
     package static func project(name: String, labels: [String: String]) -> String? {

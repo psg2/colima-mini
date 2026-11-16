@@ -9,7 +9,7 @@ The containers that share one `com.docker.compose.project` label, or else one **
 _Avoid_: Stack, app, group
 
 **Testcontainers session**:
-The containers that share one `org.testcontainers.session-id` label, shown as the project `testcontainers <first 8 characters>`. Its **Ryuk** container, `testcontainers-ryuk-<session-id>` from the `testcontainers/ryuk` image, removes them once its clients disconnect.
+The containers that share one `org.testcontainers.session-id` (or `org.testcontainers.sessionId`) label, shown as the project `testcontainers <session-id>`. Its **Ryuk** container, `testcontainers-ryuk-<session-id>` from the `testcontainers/ryuk` image, removes them once its clients disconnect.
 _Avoid_: Test project
 
 **Owner labels**:

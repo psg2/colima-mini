@@ -405,7 +405,7 @@ private actor ResultGate<Value> {
     private func leaked(_ ids: [String], cpu: String = "0.00%") throws -> Snapshot {
         let vm = #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#
         let rows = (ids + ["keep1"]).map { id in
-            #"{"ID":"\#(id)","Names":"\#(id)","Image":"postgres","State":"running","Status":"Up","Ports":"","Labels":"org.testcontainers.session-id=aaaa1111"}"#
+            #"{"ID":"\#(id)","Names":"\#(id)","Image":"postgres","State":"running","Status":"Up","Ports":"","Labels":"org.testcontainers.session-id=aaaa1111-0000"}"#
         }
         return try Snapshot.decode(
             vm: vm, containers: rows.joined(separator: "\n"),
@@ -420,29 +420,30 @@ private actor ResultGate<Value> {
             readUnused: {
                 [
                     SweepGroup(
-                        verdict: .orphan, name: "testcontainers aaaa1111", project: "testcontainers aaaa1111",
+                        verdict: .orphan, name: "testcontainers aaaa1111-0000", project: "testcontainers aaaa1111-0000",
                         reason: "Ryuk gone", containerIDs: orphanIDs),
                     SweepGroup(verdict: .active, name: "keep1", project: nil, reason: "", containerIDs: ["keep1"]),
                 ]
             })
+        model.notificationsEnabled = true
         var alerts: [CleanupAlert] = []
         model.onCleanupAlert = { alerts.append($0) }
         model.snapshot = try leaked(["tc1", "tc2", "tc3"])
 
         await model.backgroundScan()
         await model.backgroundScan()
-        #expect(alerts == [.orphans(containers: 2, groups: ["testcontainers aaaa1111"])])
+        #expect(alerts == [.orphans(containers: 2, groups: ["testcontainers aaaa1111-0000"])])
         #expect(model.orphanCount == 2)
         #expect(!model.showingSweep, "a background scan does not open the review")
 
         orphanIDs.append("tc3")
         await model.backgroundScan()
         #expect(alerts.count == 2)
-        #expect(alerts.last == .orphans(containers: 3, groups: ["testcontainers aaaa1111"]))
+        #expect(alerts.last == .orphans(containers: 3, groups: ["testcontainers aaaa1111-0000"]))
 
         model.presentUnused()
         #expect(model.showingSweep)
-        #expect(model.sweepSelection == ["testcontainers aaaa1111"])
+        #expect(model.sweepSelection == ["testcontainers aaaa1111-0000"])
         #expect(model.sweepPlan.remove.map(\.id).sorted() == ["tc1", "tc2", "tc3"])
         #expect(!FileManager.default.fileExists(atPath: log.path), "nothing ran before confirmation")
 
@@ -480,6 +481,7 @@ private actor ResultGate<Value> {
                 return []
             })
         model.cpuWatch = SustainedLoad(threshold: 80, duration: 0)
+        model.notificationsEnabled = true
         var alerts: [CleanupAlert] = []
         model.onCleanupAlert = { alerts.append($0) }
 

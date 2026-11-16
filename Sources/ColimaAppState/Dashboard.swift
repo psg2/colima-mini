@@ -825,7 +825,12 @@ package enum CleanupAlert: Equatable {
         lastBackgroundScan = now
         scanning = true
         defer { scanning = false }
-        guard let groups = try? await readUnused() else { return }
+        let groups: [SweepGroup]
+        do { groups = try await readUnused() } catch {
+            // A review opened while this scan ran shows the failure.
+            if showingSweep, sweepGroups == nil { sweepError = "Scan failed: " + error.localizedDescription }
+            return
+        }
         record(groups, at: now)
         // A review opened while this scan ran shows its results.
         if showingSweep, sweepGroups == nil { review(groups, at: now) }
@@ -854,7 +859,12 @@ package enum CleanupAlert: Equatable {
     package func presentUnused() {
         guard !sample else { return }
         navigate(.containers, project: "All containers")
-        if let latestScan {
+        if scanning {
+            // Join the running scan rather than show results it will replace.
+            sweepGroups = nil
+            sweepError = nil
+            showingSweep = true
+        } else if let latestScan {
             review(latestScan.groups, at: latestScan.date)
             sweepError = nil
             showingSweep = true

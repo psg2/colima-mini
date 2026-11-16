@@ -15,19 +15,30 @@ func exitedPID() throws -> Int32 {
 struct OwnershipTests {
     private let vm = #"{"name":"default","status":"Running","cpus":10,"memory":21474836480}"#
 
-    // Leaked test containers used to land in Standalone with no origin.
+    // Leaked test containers used to land in Standalone with no origin. Java
+    // and Go spell the session label `sessionId`; a session sharing another's
+    // prefix keeps its own reaper.
     @Test func testcontainersSessionsBecomeProjectsWithRyukStatus() throws {
         let snapshot = try Snapshot.decode(
             vm: vm,
             containers: """
                 {"ID":"r1","Names":"testcontainers-ryuk-aaaa1111bbbb","Image":"testcontainers/ryuk:0.11.0","State":"running","Status":"Up","Ports":"","Labels":"org.testcontainers=true"}
                 {"ID":"a1","Names":"brave_pg","Image":"postgres:18","State":"running","Status":"Up","Ports":"","Labels":"org.testcontainers=true,org.testcontainers.session-id=aaaa1111bbbb"}
-                {"ID":"b1","Names":"calm_pg","Image":"postgres:18","State":"running","Status":"Up","Ports":"","Labels":"org.testcontainers=true,org.testcontainers.session-id=cccc2222dddd"}
+                {"ID":"b1","Names":"calm_pg","Image":"postgres:18","State":"running","Status":"Up","Ports":"","Labels":"org.testcontainers=true,org.testcontainers.sessionId=cccc2222dddd"}
+                {"ID":"c1","Names":"keen_pg","Image":"postgres:18","State":"running","Status":"Up","Ports":"","Labels":"org.testcontainers=true,org.testcontainers.session-id=aaaa1111ffff"}
                 {"ID":"s1","Names":"loose","Image":"web","State":"running","Status":"Up","Ports":"","Labels":""}
                 """, stats: "")
 
-        #expect(snapshot.projects == ["Standalone", "testcontainers aaaa1111", "testcontainers cccc2222"])
-        #expect(snapshot.reapers == ["testcontainers aaaa1111": .alive, "testcontainers cccc2222": .gone])
+        #expect(
+            snapshot.projects == [
+                "Standalone", "testcontainers aaaa1111bbbb", "testcontainers aaaa1111ffff",
+                "testcontainers cccc2222dddd",
+            ])
+        #expect(
+            snapshot.reapers == [
+                "testcontainers aaaa1111bbbb": .alive, "testcontainers aaaa1111ffff": .gone,
+                "testcontainers cccc2222dddd": .gone,
+            ])
     }
 
     @Test func ownerFolderIsTheOriginWhenComposeRecordedNone() throws {

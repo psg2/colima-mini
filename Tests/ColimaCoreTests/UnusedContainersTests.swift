@@ -195,18 +195,18 @@ struct UnusedContainersTests {
             }, extraRunning: ["tcdead000001", "ryuklive0001", "tclive000001", "tclive000002", "owned0000001"])
 
         let byName = Dictionary(uniqueKeysWithValues: groups.map { ($0.name, $0) })
-        let dead = try #require(byName["testcontainers deadsess"])
+        let dead = try #require(byName["testcontainers deadsession01"])
         #expect(dead.verdict == .orphan)
         #expect(dead.containerIDs == ["tcdead000001", "tcdead000002"])
         #expect(dead.reason.contains("Ryuk gone"))
-        #expect(dead.project == "testcontainers deadsess")
+        #expect(dead.project == "testcontainers deadsession01")
 
-        let lost = try #require(byName["testcontainers livesess · owner gone"])
+        let lost = try #require(byName["testcontainers livesession01 · owner gone"])
         #expect(lost.verdict == .orphan)
         #expect(lost.containerIDs == ["tclive000002"])
         #expect(lost.reason == "owner process \(deadPID) exited")
 
-        let live = try #require(byName["testcontainers livesess"])
+        let live = try #require(byName["testcontainers livesession01"])
         #expect(live.verdict != .orphan)
         #expect(Set(live.containerIDs) == ["ryuklive0001", "tclive000001"])
         #expect(live.reason.hasPrefix("Ryuk alive"))

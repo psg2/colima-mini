@@ -82,7 +82,7 @@ can tell when nobody will come back for them:
 | `dev.owner.pid` | PID, on this Mac, of the process that created the container. | That process has exited. |
 
 ```sh
-docker run --label dev.owner.working_dir="$PWD" --label dev.owner.pid=$$ postgres:18
+docker run -e POSTGRES_PASSWORD=postgres --label dev.owner.working_dir="$PWD" --label dev.owner.pid=$$ postgres:18
 ```
 
 The [user guide](docs/guide.md) covers each page, and
