@@ -25,6 +25,22 @@ package struct Snapshot {
             vm: profile, containers: rows,
             usage: Dictionary(metrics.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }))
     }
+    // Each Testcontainers session project's reaper, by project name.
+    package var reapers: [String: Testcontainers.Reaper] {
+        var sessions: [String: [Container]] = [:]
+        for container in containers where container.testcontainersSession != nil {
+            sessions[container.project, default: []].append(container)
+        }
+        return sessions.compactMapValues { members in
+            // A Compose project that also carries session labels is not a session.
+            guard members.allSatisfy({ $0.label("com.docker.compose.project") == nil }) else { return nil }
+            return Testcontainers.reaper(
+                ryukRunning: members.contains { $0.running && $0.isRyuk },
+                hasOwnerPID: members.contains {
+                    OwnerLabel.pid(in: $0.labelMap).map(OwnerLabel.processAlive) == true
+                })
+        }
+    }
     package func metric(for container: Container) -> Usage? {
         guard container.running else { return nil }
         return usage[container.id] ?? usage.first(where: { container.id.hasPrefix($0.key) })?.value

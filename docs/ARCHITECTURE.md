@@ -28,6 +28,8 @@ the `.app` bundle. It copies `Resources/Info.plist` and stamps the version from
 
 Every Docker command passes `--context colima`. The unused-container scan reads
 `docker inspect`, `docker stats`, `docker logs` and `lsof`, and changes nothing.
+It checks `dev.owner.pid` with `kill(pid, 0)`, which sends no signal. The
+background scan runs the same read-only scan on a timer.
 Subprocess output goes to private temporary files that the app deletes when the
 command finishes.
 Logs never leave the Mac.

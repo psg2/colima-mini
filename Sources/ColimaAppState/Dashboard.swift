@@ -31,12 +31,37 @@ package struct PendingAction: Identifiable {
     }
 }
 
+// Something the background checks found that deserves a cleanup review.
+package enum CleanupAlert: Equatable {
+    case orphans(containers: Int, groups: [String])
+    case highCPU(percent: Int, minutes: Int)
+    package var title: String {
+        switch self {
+        case .orphans(let containers, _):
+            return containers == 1 ? "1 orphaned container" : "\(containers) orphaned containers"
+        case .highCPU(let percent, let minutes):
+            return "Colima CPU at \(percent)% for \(minutes) min"
+        }
+    }
+    package var message: String {
+        switch self {
+        case .orphans(_, let groups):
+            let names = groups.prefix(3).joined(separator: ", ")
+            return (groups.count > 3 ? names + " and \(groups.count - 3) more" : names)
+                + ". Nothing will remove them. Review before cleaning up."
+        case .highCPU:
+            return "Review unused containers to see what is still running."
+        }
+    }
+}
+
 @MainActor package final class Dashboard: ObservableObject {
     package let backend: Backend
     private let readSnapshot: () async throws -> Snapshot
     private let streamLogs: (String) -> AsyncThrowingStream<String, Error>
     private let readDetails: (String) async throws -> ContainerDetails
     private let readVolumes: () async throws -> [Volume]
+    private let readUnused: () async throws -> [SweepGroup]
     private var refreshTask: Task<Snapshot, Error>?
     private var refreshGeneration = 0
     private var logGeneration = 0
@@ -45,10 +70,15 @@ package struct PendingAction: Identifiable {
     // Containers changed by this app recently; their transitions are not alerts.
     private var actedOn: [String: Date] = [:]
     package var onAlerts: (([ContainerAlert]) -> Void)?
+    package var onCleanupAlert: ((CleanupAlert) -> Void)?
     @Published package var route = AppRoute.containers
     @Published package var snapshot: Snapshot? {
         // Checked once per snapshot, not on every render: each check reads the disk.
-        didSet { orphanedProjects = findOrphanedProjects() }
+        didSet {
+            orphanedProjects = findOrphanedProjects()
+            reapers = snapshot?.reapers ?? [:]
+            countOrphans()
+        }
     }
     @Published package var error: String?
     @Published package var refreshing = false
@@ -131,19 +161,43 @@ package struct PendingAction: Identifiable {
     @Published package var history: [String: [MetricSample]] = [:]
     @Published package var totalHistory: [MetricSample] = []
     @Published package var notificationsEnabled = true
+    // Minutes between background scans for orphaned containers; 0 turns them off.
+    @Published package var backgroundScanInterval = 15
+    package static let backgroundScanChoices = [0, 5, 15, 30, 60]
+    // The latest scan's groups, kept apart from an open review so a background
+    // scan never replaces what the user is looking at.
+    @Published package private(set) var latestScan: (groups: [SweepGroup], date: Date)? {
+        didSet { countOrphans() }
+    }
+    // Containers of the latest scan's orphan groups that still exist. Stored:
+    // the menu bar reads it on every render.
+    @Published package private(set) var orphanCount = 0
+    // Each Testcontainers session project's reaper, per snapshot.
+    package private(set) var reapers: [String: Testcontainers.Reaper] = [:]
+    private var lastBackgroundScan: Date?
+    // Orphaned containers already notified, so each one notifies once.
+    private var notifiedOrphans: Set<String> = []
+    // VM CPU, as a share of its cores, that counts as high when sustained.
+    @Published package var cpuWatch = SustainedLoad(threshold: 80, duration: 300)
+    package var cpuHigh: Bool { cpuWatch.sustained }
+    package var cpuAlert: CleanupAlert {
+        .highCPU(percent: Int(cpuWatch.threshold), minutes: Int(cpuWatch.duration / 60))
+    }
 
     package init(
         backend: Backend,
         readSnapshot: (() async throws -> Snapshot)? = nil,
         streamLogs: ((String) -> AsyncThrowingStream<String, Error>)? = nil,
         readDetails: ((String) async throws -> ContainerDetails)? = nil,
-        readVolumes: (() async throws -> [Volume])? = nil
+        readVolumes: (() async throws -> [Volume])? = nil,
+        readUnused: (() async throws -> [SweepGroup])? = nil
     ) {
         self.backend = backend
         self.readSnapshot = readSnapshot ?? { try await backend.snapshot() }
         self.streamLogs = streamLogs ?? { backend.followLogs($0) }
         self.readDetails = readDetails ?? { try await backend.details($0) }
         self.readVolumes = readVolumes ?? { try await backend.volumes() }
+        self.readUnused = readUnused ?? { try await backend.unusedContainers() }
         if backend.fixture == nil {
             let defaults = UserDefaults.standard
             onlyRunning = defaults.bool(forKey: "onlyRunning")
@@ -153,6 +207,10 @@ package struct PendingAction: Identifiable {
             refreshInterval = [5, 10, 30, 60].contains(interval) ? interval : 5
             notificationsEnabled =
                 defaults.object(forKey: "notifications") == nil || defaults.bool(forKey: "notifications")
+            let scanInterval = defaults.object(forKey: "backgroundScanInterval") as? Int ?? 15
+            backgroundScanInterval = Self.backgroundScanChoices.contains(scanInterval) ? scanInterval : 15
+        } else {
+            backgroundScanInterval = 0
         }
     }
     package func savePreferences() {
@@ -163,6 +221,7 @@ package struct PendingAction: Identifiable {
         defaults.set(Array(collapsed), forKey: "collapsedProjects")
         defaults.set(refreshInterval, forKey: "refreshInterval")
         defaults.set(notificationsEnabled, forKey: "notifications")
+        defaults.set(backgroundScanInterval, forKey: "backgroundScanInterval")
     }
     package func restoreLastSection() {
         guard !sample, let name = UserDefaults.standard.string(forKey: "lastSection") else { return }
@@ -237,7 +296,10 @@ package struct PendingAction: Identifiable {
     package private(set) var orphanedProjects: [String] = []
     private func findOrphanedProjects() -> [String] {
         guard !sample else { return [] }
-        return (snapshot?.projects ?? []).filter { origin(of: $0).map { !$0.exists() } ?? false }
+        // Standalone containers each have their own folder, if any.
+        return (snapshot?.projects ?? []).filter {
+            $0 != "Standalone" && (origin(of: $0).map { !$0.exists() } ?? false)
+        }
     }
     package func origin(of project: String) -> ProjectOrigin? {
         containers.first { $0.project == project && $0.origin != nil }?.origin
@@ -350,17 +412,17 @@ package struct PendingAction: Identifiable {
                 }
             }
             history = history.filter { key, _ in updated.containers.contains { $0.id == key } }
+            // Relative to VM capacity, unlike per-container samples.
+            let vmCPU =
+                updated.vm.running ? updated.totalCPU(updated.containers) / Double(max(1, updated.vm.cpus)) : 0
             if updated.vm.running {
                 totalHistory = Array(
                     (totalHistory
                         + [
-                            // Relative to VM capacity, unlike per-container samples.
-                            MetricSample(
-                                date: date,
-                                cpu: updated.totalCPU(updated.containers) / Double(max(1, updated.vm.cpus)),
-                                memory: updated.totalMemory(updated.containers))
+                            MetricSample(date: date, cpu: vmCPU, memory: updated.totalMemory(updated.containers))
                         ]).suffix(60))
             }
+            watchCPU(vmCPU, at: date)
             if project != "All containers" && !updated.projects.contains(project) {
                 project = "All containers"
             }
@@ -378,6 +440,15 @@ package struct PendingAction: Identifiable {
         let alerts = ContainerAlert.changes(from: previous.containers, to: updated.containers)
             .filter { actedOn[$0.containerID] == nil }
         if !alerts.isEmpty { onAlerts?(alerts) }
+    }
+    private func watchCPU(_ percent: Double, at date: Date) {
+        guard !sample else { return }
+        guard cpuWatch.record(percent, at: date) else { return }
+        if notificationsEnabled {
+            onCleanupAlert?(.highCPU(percent: Int(percent.rounded()), minutes: Int(cpuWatch.duration / 60)))
+        }
+        // Scan now, so the review the alert opens has fresh results.
+        Task { await self.backgroundScan() }
     }
     // Follows a container's output until the page changes, logs are paused or
     // the container stops. The buffer is replaced only when the new stream
@@ -712,18 +783,93 @@ package struct PendingAction: Identifiable {
         await refresh()
     }
     package func scan() async {
-        guard !scanning, !busy else { return }
+        // A background scan is running: the review shows its results.
+        if scanning {
+            sweepGroups = nil
+            showingSweep = true
+            return
+        }
+        guard !busy else { return }
         scanning = true
         showingSweep = true
         defer { scanning = false }
         sweepError = nil
         do {
-            let groups = try await backend.unusedContainers()
-            sweepGroups = groups
-            sweepSelection = Set(groups.filter(\.verdict.suggested).map(\.id))
-            sweptAt = Date()
+            let groups = try await readUnused()
+            let date = Date()
+            review(groups, at: date)
+            record(groups, at: date)
         } catch {
             sweepError = "Scan failed: " + error.localizedDescription
+        }
+    }
+    private func review(_ groups: [SweepGroup], at date: Date) {
+        sweepGroups = groups
+        sweepSelection = Set(groups.filter(\.verdict.suggested).map(\.id))
+        sweptAt = date
+    }
+    private func record(_ groups: [SweepGroup], at date: Date) { latestScan = (groups, date) }
+    // The latest scan's orphan groups with the containers that still exist.
+    private var orphans: [(group: SweepGroup, members: [Container])] {
+        (latestScan?.groups ?? []).filter { $0.verdict == .orphan }.map { ($0, members(of: $0)) }
+            .filter { !$0.members.isEmpty }
+    }
+    private func countOrphans() {
+        let count = orphans.reduce(0) { $0 + $1.members.count }
+        if count != orphanCount { orphanCount = count }
+    }
+    // Reads only, like the review's scan, and notifies once per newly
+    // orphaned container. It never removes anything.
+    package func backgroundScan(now: Date = Date()) async {
+        guard !sample, !scanning, !busy, snapshot?.vm.running == true else { return }
+        lastBackgroundScan = now
+        scanning = true
+        defer { scanning = false }
+        let groups: [SweepGroup]
+        do { groups = try await readUnused() } catch {
+            // A review opened while this scan ran shows the failure.
+            if showingSweep, sweepGroups == nil { sweepError = "Scan failed: " + error.localizedDescription }
+            return
+        }
+        record(groups, at: now)
+        // A review opened while this scan ran shows its results.
+        if showingSweep, sweepGroups == nil { review(groups, at: now) }
+        let orphans = orphans
+        let ids = Set(orphans.flatMap { $0.members.map(\.id) })
+        let fresh = ids.subtracting(notifiedOrphans)
+        notifiedOrphans = ids
+        if !fresh.isEmpty, notificationsEnabled {
+            onCleanupAlert?(.orphans(containers: ids.count, groups: orphans.map(\.group.name)))
+        }
+    }
+    // Runs background scans every `backgroundScanInterval` minutes, checking
+    // once a `tick` so a changed interval applies without a restart.
+    package func watchUnused(tick: Duration = .seconds(60)) async {
+        while !Task.isCancelled {
+            let interval = TimeInterval(backgroundScanInterval * 60)
+            if interval > 0, lastBackgroundScan.map({ Date().timeIntervalSince($0) >= interval }) ?? true {
+                await backgroundScan()
+            }
+            do { try await Task.sleep(for: tick) } catch { return }
+        }
+    }
+    // Opens the review from a notification or the menu bar: the latest scan's
+    // results when there are any, otherwise a new scan. Nothing is removed
+    // until the user confirms Clean up.
+    package func presentUnused() {
+        guard !sample else { return }
+        navigate(.containers, project: "All containers")
+        if scanning {
+            // Join the running scan rather than show results it will replace.
+            sweepGroups = nil
+            sweepError = nil
+            showingSweep = true
+        } else if let latestScan {
+            review(latestScan.groups, at: latestScan.date)
+            sweepError = nil
+            showingSweep = true
+        } else {
+            Task { await scan() }
         }
     }
     // The group's containers as they are now, so a row reflects actions taken

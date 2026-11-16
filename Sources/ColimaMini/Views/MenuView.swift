@@ -36,8 +36,19 @@ struct MenuView: View {
                 Divider()
                 attention
             }
+            let orphans = model.orphanCount
+            if orphans > 0 || model.cpuHigh {
+                VStack(alignment: .leading, spacing: 4) {
+                    if orphans > 0 {
+                        reviewLink(
+                            CleanupAlert.orphans(containers: orphans, groups: []).title, symbol: "trash.circle",
+                            id: "menu.orphans")
+                    }
+                    if model.cpuHigh { reviewLink(model.cpuAlert.title, symbol: "flame", id: "menu.cpu") }
+                }
+            }
             let orphaned = model.orphanedProjects
-            if !orphaned.isEmpty {
+            if !orphaned.isEmpty && orphans == 0 {
                 Button {
                     model.navigate(.containers, project: "All containers")
                     showDashboard()
@@ -183,6 +194,18 @@ struct MenuView: View {
         }
         if let origin { parts.append(origin.summary) }
         return parts.joined(separator: " · ")
+    }
+    // Opens the unused-container review; removal still needs its confirmation.
+    private func reviewLink(_ title: String, symbol: String, id: String) -> some View {
+        Button {
+            showDashboard()
+            model.presentUnused()
+        } label: {
+            Label(title, systemImage: symbol).lineLimit(1)
+        }.buttonStyle(.link).font(.caption).foregroundStyle(.orange)
+            .help("Review unused containers")
+            .disabled(model.busy)
+            .accessibilityIdentifier(id)
     }
     private func project(_ project: String) -> some View {
         let containers = model.containers.filter { $0.project == project }

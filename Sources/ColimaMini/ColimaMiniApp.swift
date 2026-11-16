@@ -89,27 +89,47 @@ import SwiftUI
     }
 }
 
-// The label lives for the whole app session, so it owns the refresh loop and
-// the window opener used by notifications.
+// The label lives for the whole app session, so it owns the refresh loop, the
+// background scan and the window opener used by notifications.
 struct MenuBarLabel: View {
     @ObservedObject var model: Dashboard
     @Environment(\.openWindow) private var openWindow
     var body: some View {
         let attention = model.attention.count
+        let orphans = model.orphanCount
         HStack(spacing: 3) {
             Image(nsImage: model.snapshot?.vm.running == false ? llamaMenuIconDimmed : llamaMenuIcon)
             if attention > 0 { Text("\(attention)").monospacedDigit() }
+            // Orphans and sustained CPU load point to the cleanup review.
+            if orphans > 0 || model.cpuHigh {
+                Image(systemName: model.cpuHigh ? "flame" : "trash.circle")
+                if orphans > 0 { Text("\(orphans)").monospacedDigit() }
+            }
         }
         .accessibilityLabel(
-            attention > 0 ? "Colima Mini, \(attention) containers need attention" : "Colima Mini"
+            [
+                "Colima Mini",
+                attention > 0 ? "\(attention) containers need attention" : nil,
+                orphans > 0 ? "\(orphans) orphaned containers" : nil,
+                model.cpuHigh ? "CPU high" : nil,
+            ].compactMap { $0 }.joined(separator: ", ")
         )
         .task {
-            Notifier.shared.attach(to: model) { id in
-                model.openContainer(id, tab: .logs)
-                openWindow(id: "dashboard")
-                NSApp.activate(ignoringOtherApps: true)
-            }
+            Notifier.shared.attach(
+                to: model,
+                openLogs: { id in
+                    model.openContainer(id, tab: .logs)
+                    openWindow(id: "dashboard")
+                    NSApp.activate(ignoringOtherApps: true)
+                },
+                openReview: {
+                    openWindow(id: "dashboard")
+                    NSApp.activate(ignoringOtherApps: true)
+                    model.presentUnused()
+                })
+            async let scans: Void = model.watchUnused()
             await model.poll { NSApp.isActive }
+            await scans
         }
     }
 }

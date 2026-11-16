@@ -72,9 +72,18 @@ Removing a container keeps its volumes. Only stopped containers can be removed.
 ### Unused containers
 
 **Review unused containers** in the Containers header scans every container and
-groups them by project with a verdict: project folder deleted, stopped for over a
-day, running but idle, quiet but logged recently, or in use. The scan itself
-changes nothing.
+groups them by project with a verdict: owner gone, stopped for over a day,
+running but idle, quiet but logged recently, or in use. The scan itself changes
+nothing.
+
+A container's owner is gone when its Compose or `dev.owner.working_dir` folder
+was deleted, the process named by `dev.owner.pid` exited, or it belongs to a
+Testcontainers session whose Ryuk container no longer runs. Testcontainers
+containers are grouped by session (`testcontainers <id>`) instead of Standalone,
+and the group shows **Ryuk alive** or **Ryuk gone**. When only some containers of
+a live project or session lost their owner, they form a separate
+`… · owner gone` group. The [owner labels](../README.md#owner-labels) are
+documented in the README.
 
 The suggested groups start selected; uncheck any you want to keep, or check a
 kept group. **Clean up** asks once, then stops and removes the containers of
@@ -85,6 +94,13 @@ volumes.
 
 Projects whose folder was deleted show a folder badge on that button and in the
 sidebar, and the menu bar lists them.
+
+The scan also runs in the background, every 15 minutes by default (**Settings >
+General > Check for orphaned containers**; never in sample mode). When it finds
+new orphaned containers, or Colima's CPU stays above 80% of its cores for 5
+minutes, the menu bar icon shows a mark and count and a notification appears.
+Clicking either opens this review with the orphans selected. Nothing is removed
+until you confirm **Clean up**.
 
 ## Container page
 

@@ -1,12 +1,12 @@
 import Foundation
 
-// The scanner groups containers by Compose project (standalone containers are
-// their own group) and gives each group one verdict.
+// The scanner groups containers by Compose project or Testcontainers session
+// (other containers are their own group) and gives each group one verdict.
 package enum SweepVerdict: String, Decodable, CaseIterable {
     case orphan, stale, idle, recent, active, stopped
     package var title: String {
         switch self {
-        case .orphan: return "Project folder deleted"
+        case .orphan: return "Owner gone"
         case .stale: return "Stopped for over a day"
         case .idle: return "Running but idle"
         case .recent: return "Quiet, logged recently"
@@ -17,7 +17,8 @@ package enum SweepVerdict: String, Decodable, CaseIterable {
     package var explanation: String {
         switch self {
         case .orphan:
-            return "Its Compose folder no longer exists, usually a deleted worktree. Stop and remove it."
+            return
+                "Its folder was deleted, the process that created it exited, or its Testcontainers session lost Ryuk. Nothing else will remove it."
         case .stale:
             return "Removing it keeps its volumes; `docker compose up` recreates the containers."
         case .idle:

@@ -31,11 +31,23 @@ struct ProjectSection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(project).font(.headline).lineLimit(1).truncationMode(.middle)
+                        switch model.reapers[project] {
+                        case .alive:
+                            badge("Ryuk alive", .secondary, help: "This Testcontainers session's reaper is running.")
+                        case .ownerRunning:
+                            badge(
+                                "Ryuk gone, owner running", .secondary,
+                                help: "No reaper, but the process that created these containers is still running.")
+                        case .gone:
+                            badge(
+                                "Ryuk gone", .orange,
+                                help: "This Testcontainers session's reaper is gone, so nothing will remove its containers.")
+                        case nil: EmptyView()
+                        }
                         if let origin, model.orphanedProjects.contains(project) {
-                            Text("Folder missing").font(.caption2.weight(.medium)).foregroundStyle(.orange)
-                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.13), in: Capsule())
-                                .help("\(origin.displayPath) no longer exists. The worktree may have been removed.")
+                            badge(
+                                "Folder missing", .orange,
+                                help: "\(origin.displayPath) no longer exists. The worktree may have been removed.")
                         }
                     }
                     HStack(spacing: 4) {
@@ -63,5 +75,11 @@ struct ProjectSection: View {
             Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10)
         )
         .accessibilityIdentifier("project.group." + project)
+    }
+    private func badge(_ text: String, _ color: Color, help: String) -> some View {
+        Text(text).font(.caption2.weight(.medium)).foregroundStyle(color)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(color.opacity(0.13), in: Capsule())
+            .help(help)
     }
 }
