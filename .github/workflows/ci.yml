@@ -38,7 +38,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned repository tools
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       - name: Run quality gates
         run: mise run ci
   minimum-macos:
@@ -56,7 +56,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned repository tools
-        uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       # The package needs Swift 6; pin the newest Xcode 16 the image has.
       - name: Select the newest Xcode 16
         run: |
